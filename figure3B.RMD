@@ -1,0 +1,122 @@
+---
+title: "Untitled"
+author: "+ Qingsong Cai"
+date: "2024-04-17"
+output: html_document
+---
+
+
+```{r, warning=FALSE, message=FALSE}
+#Data manipulation and tidy tools
+library(dplyr)
+library(tidyverse)
+library(stringi)
+
+# Plotting and visualization
+library(ggplot2)
+library(ggpubr)
+library(RColorBrewer)
+library(ggrepel)
+library(pheatmap)
+library(ggfortify)
+library(dendextend)
+library(factoextra)
+library(FactoMineR)
+
+# Interactive and HTML
+library(DT)
+library(htmltools)
+
+# Differential expression & bioinformatics
+library(DESeq2)
+library(fgsea)
+library(sva)
+library(biomaRt)
+
+# PCA and multivariate
+library(PCAtools)
+
+# Survival analysis
+library(survival)
+library(survminer)
+
+# Specialized tools
+library(TBSignatureProfiler)
+```
+
+```{r}
+load("../../processed_data/RNAseq_MCL_cell_lines/Data/2023_0518.shrinkLvV.rdata")
+```
+
+
+```{r}
+# Generate 3 sets of 200 words
+set1 <- shrinkLvV.JekoR_10[shrinkLvV.JekoR_10$log2FoldChange > 0    & shrinkLvV.JekoR_10$padj < 0.01  & !is.na(shrinkLvV.JekoR_10$padj),  ]$Symbol
+
+set2 <- shrinkLvV.MinoR_10[shrinkLvV.MinoR_10$log2FoldChange > 0    & shrinkLvV.MinoR_10$padj < 0.01 & !is.na(shrinkLvV.MinoR_10$padj),  ]$Symbol
+
+set3 <- shrinkLvV_MinoR_H_vs_T10[shrinkLvV_MinoR_H_vs_T10$log2FoldChange < 0        &   shrinkLvV_MinoR_H_vs_T10$padj < 0.01 & !is.na(shrinkLvV_MinoR_H_vs_T10$padj) ,  ]$Symbol
+
+length(intersect(intersect(set1, set2),set3))
+```
+
+
+### Use ShinyGO (v0.80) to analyze the set of 548 genes. Retrieve results from the “Curated MSigDB” and “GO Biological Process” categories to generate enrichment plots.
+
+```{r}
+library(readxl)
+library(stringr)
+library(ggplot2)
+t2<- read_xlsx("Figure3B.data.with.MEGA_UP548_toShinyGo80.xlsx",sheet = "Curated.MSigDB80")[1:9,]
+t3<- read_xlsx("Figure3B.data.with.MEGA_UP548_toShinyGo80.xlsx",sheet = "GO Biological Process80")[1:9,]#
+t3
+t3$Pathway <- str_split_fixed(t3$Pathway, " ", 2)[,2]
+```
+
+```{r}
+t23 <- rbind(t2[3,],t3)
+t23 <- t23[order(t23$`Fold Enrichment`),]
+t23[t23$Pathway %in% "BENPORATH ES 1",]$Pathway <- "embryonic stem cell"
+t23$Pathway <- factor(t23$Pathway, levels = (t23$Pathway))
+t23
+
+t23$FDR <- t23$`Enrichment FDR`
+```
+
+```{r, fig.height=3, fig.width=5}
+p1 <- ggplot(t23, aes(x = `Fold Enrichment`, y = Pathway , color = -log10(FDR) )) +
+  geom_point(aes(size = nGenes ))  +  #`N. of Genes`
+  geom_segment(aes(x = 0, xend = `Fold Enrichment`, y = Pathway, yend = Pathway ))  + 
+  scale_color_continuous(
+          low =  "blue", #input$SortPathwaysPlotLowColor,
+          high = "red", # input$SortPathwaysPlotHighColor,
+          #name = names(columns)[columns == colorBy],
+          guide = guide_colorbar(reverse = TRUE)
+        ) +  theme_classic()+  
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  theme(axis.title.y = element_blank()) #+ xlim(0,12)
+p1+ theme(axis.text = element_text(size =12)) +
+  theme(legend.key.size = unit(0.5, 'cm'))
+```
+
+
+
+```{r, fig.width =10, fig.height =10} 
+library("ggpubr")
+pdf(file = "pdf/20250423.RO1-01.pdf",
+    width = 15.2, # The width    of the plot in inches
+    height = 21.2)
+ 
+ggarrange(p1+ theme(axis.text = element_text(size =12), 
+                    axis.ticks.y = element_blank(),
+                    legend.text =  element_text(size =8)) +
+  theme(legend.key.size = unit(0.3, 'cm')),
+ncol=2, 
+widths = c(1.8,3.2),
+nrow=8 
+) + theme(plot.margin = margin(2,2,2,2, "cm"))
+dev.off()
+```
+
+
+

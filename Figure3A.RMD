@@ -1,0 +1,95 @@
+---
+title: "Fig3A for DTP cells Blood manuscript"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-07-07'
+---
+
+```{r, warning=FALSE, message=FALSE}
+#Data manipulation and tidy tools
+library(dplyr)
+library(tidyverse)
+library(stringi)
+
+# Plotting and visualization
+library(ggplot2)
+library(ggpubr)
+library(RColorBrewer)
+library(ggrepel)
+library(pheatmap)
+library(ggfortify)
+library(dendextend)
+library(factoextra)
+library(FactoMineR)
+
+# Interactive and HTML
+library(DT)
+library(htmltools)
+
+# Differential expression & bioinformatics
+library(DESeq2)
+library(fgsea)
+library(sva)
+library(biomaRt)
+
+# PCA and multivariate
+library(PCAtools)
+
+# Survival analysis
+library(survival)
+library(survminer)
+
+# Specialized tools
+library(TBSignatureProfiler)
+```
+
+```{r}
+load("../../processed_data/RNAseq_MCL_cell_lines/Data/2023_0518.shrinkLvV.rdata")
+```
+
+
+```{r}
+# Generate 3 sets of 200 words
+set1 <- shrinkLvV.JekoR_10[shrinkLvV.JekoR_10$log2FoldChange > 0    & shrinkLvV.JekoR_10$padj < 0.01  & !is.na(shrinkLvV.JekoR_10$padj),  ]$Symbol
+
+set2 <- shrinkLvV.MinoR_10[shrinkLvV.MinoR_10$log2FoldChange > 0    & shrinkLvV.MinoR_10$padj < 0.01 & !is.na(shrinkLvV.MinoR_10$padj),  ]$Symbol
+
+set3 <- shrinkLvV_MinoR_H_vs_T10[shrinkLvV_MinoR_H_vs_T10$log2FoldChange < 0        &   shrinkLvV_MinoR_H_vs_T10$padj < 0.01 & !is.na(shrinkLvV_MinoR_H_vs_T10$padj) ,  ]$Symbol
+```
+
+```{r}
+length(intersect(intersect(set1, set2),set3))
+```
+
+
+```{r}
+library(BioVenn)
+```
+```{r}
+pdf("./pdf/fig3_A.pdf", width = 6, height = 6)
+draw.venn(set1, set2, set3,title="Giant_UP", nrtype="abs", subtitle ="",
+                     xtitle = "",
+                     ytitle = "",
+                     ztitle = "",
+                    x_c = "red", 
+    y_c = "green",
+    z_c = "blue", 
+                     bg_c = "white", filename ="./pdf/fig3_A.pdf")
+dev.off()
+```
+
+```{r}
+#install.packages("BioVenn")
+
+biovenn <- draw.venn(set1, set2, set3,title="Giant_UP", nrtype="abs", subtitle ="",
+                     xtitle = "JekoR_10",
+                     ytitle = "MinoR_10",
+                     ztitle = "MinoR_H",
+                    x_c = "red", 
+    y_c = "green",
+    z_c = "blue", 
+                     bg_c = "white")
+```
+
+
+
