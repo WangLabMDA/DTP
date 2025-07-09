@@ -1,0 +1,312 @@
+---
+title: "supp Figure 3G, 4C and 6E for DTP cells Blood manuscript"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-07-07'
+---
+
+## The following code repoduces the figure 3G in Mega cell manuscripts by Qingsong Cai.
+```{r,warning=FALSE, message=FALSE}
+
+library(tidyverse)
+#library(htmltools)
+library(dplyr)
+library(biomaRt)
+library(DESeq2)
+library(gplots)
+library(RColorBrewer)
+library("ggrepel")
+library(ggplot2)
+library("DT")
+library(fgsea)
+library(ggfortify)
+library("FactoMineR")
+library("factoextra")
+library("pheatmap")
+library(dendextend)
+library(stringi)
+library(sva)
+library(PCAtools)
+library(TBSignatureProfiler)
+library("survival")
+library("survminer")
+library(readxl)
+library(patchwork)
+library(pheatmap)
+library(fgsea)
+#library(clusterProfiler)
+library(dplyr)
+library(tibble)
+
+pathways.all <-   readRDS("../../processed_data/RNAseq_MCL_cell_lines/Data/v2022.pathways.all.rds")
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+ddsObj.MinoR.all <-   readRDS("../../processed_data/RNAseq_MCL_cell_lines/Data/ddsObj.MinoR.B1B4H2.2023_0517.RDS")
+
+normalizedCounts_MinoR_all <- counts(ddsObj.MinoR.all, normalized=TRUE)
+sampleinfo3_MinoR_all<- data.frame(ddsObj.MinoR.all@colData )
+
+sampleinfo3_MinoR_all$Treatment <- as.character(sampleinfo3_MinoR_all$Treatment)
+#unique(sampleinfo3_MinoR_all$Treatment)
+sampleinfo3_MinoR_all[sampleinfo3_MinoR_all$Treatment %in% "D1" ,]$Treatment <- "R1"
+sampleinfo3_MinoR_all[sampleinfo3_MinoR_all$Treatment %in% "D2" ,]$Treatment <- "R2"
+sampleinfo3_MinoR_all$Treatment <- factor(sampleinfo3_MinoR_all$Treatment, levels = c("P", "(1)",   "(5)",  "M1(10)", "R1", "M2(10)" ,"R2" ,    "M3(10)"
+  
+))
+```
+
+
+
+```{r,warning=FALSE, message=FALSE}
+exponent=1
+minGSSize = 10
+maxGSSize = 1000 
+pvalueCutoff=0.05
+pAdjustMethod="BH"
+verbose=TRUE
+seed=FALSE
+by = 'fgsea'
+eps= 1e-10
+```
+
+
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+getsig_score_plot_MR_all4 <- function(path) {
+  coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+#show_col(  coln4)
+#show_col(coln4[c(1:5,4,5,4)])
+coln5 <- coln4[c(1,4,5,4,5,4)]
+#  path = "KEGG_B_CELL_RECEPTOR_SIGNALING_PATHWAY"
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+
+pathway <- pathways.all[path]
+
+sampleinfo <- sampleinfo3_MinoR_all[!sampleinfo3_MinoR_all$Treatment %in% c("(1)","(5)"),]
+
+testdataSE <- SummarizedExperiment(assays = SimpleList(data =as.matrix(normalizedCounts_MinoR_all[,sampleinfo$samples])),
+                                   colData = DataFrame(sample =  sampleinfo$treatment)    )
+
+testdataSE@assays@data@listData$counts <- testdataSE@assays@data@listData$data
+hivtb_data <- mkAssay(testdataSE, log = TRUE, counts_to_CPM = TRUE)
+
+ssgsea_result <- runTBsigProfiler(input = hivtb_data,
+                                  useAssay =  "log_counts_cpm", # "log_cpm",
+                                  signatures = pathway,
+                                  algorithm = c("GSVA", "ssGSEA"),
+                                  combineSigAndAlgorithm = TRUE,
+                                  parallel.sz = 1, update_genes = FALSE)
+ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+
+
+s <- sampleinfo
+s$Sig_Score <-# ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+s$pathway <- path
+
+
+
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+t1 <- s
+t1$Treatment2 <- as.character( t1$Treatment )
+t1[t1$Treatment %in% "M1(10)",]$Treatment2 <- "M1"
+t1[t1$Treatment %in% "M2(10)",]$Treatment2 <- "M2"
+t1[t1$Treatment %in% "M3(10)",]$Treatment2 <- "M3"
+t1$Treatment2 <- factor(t1$Treatment2, levels = c("P",  "M1", "R1" , "M2", "R2", "M3"))
+#t1$Treatment2 <- as.character( t1$Treatment )
+
+
+MyComparisons11 = list(c("P", "M1") ,
+                       c("M1", "R1"),
+                       c("R1", "M2") ) 
+
+MyComparisons22 = list( c("R2", "M2"),   c("R2", "M3") )
+
+t4 <- data_summary(t1, "Sig_Score" ,  c( "Treatment2" , "pathway"))
+
+ MR <- ggplot(t1, aes(x=Treatment2, y=Sig_Score, fill= Treatment2)) + 
+  
+
+  geom_line(data = t4,aes(x = as.factor(Treatment2),y=Sig_Score, group = 1), color= "lightgray", size =2) +geom_boxplot()+ geom_point( color = "grey", scales = "free")+
+ geom_boxplot()+ 
+     stat_compare_means(comparisons = MyComparisons11,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+    stat_compare_means(comparisons = MyComparisons22,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+ #  stat_compare_means(comparisons = MyComparisons33,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+   
+ theme(legend.title=element_blank()) + scale_fill_manual(values= coln5)+
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) +theme(strip.background = element_blank()) +   theme(axis.text.x = element_text(angle = 45, hjust=1))+ theme(legend.position = "none", )+ ggtitle(path) + theme(plot.title = element_text(hjust = 0.5, size = 10), axis.title.x = element_blank()) + ylab("ssGSEA Signature Score")
+return(MR)
+}
+```
+
+# fig3C
+```{r, warning=FALSE, message=FALSE, fig.width = 5, fig.height = 3}
+fig3G  <- getsig_score_plot_MR_all4("REACTOME_DOWNSTREAM_SIGNALING_EVENTS_OF_B_CELL_RECEPTOR_BCR")
+fig3G
+```
+
+
+# fig 4C
+```{r, warning=FALSE, message=FALSE, fig.width = 5, fig.height = 4}
+ getsig_score_plot_MR_all4("JAATINEN_HEMATOPOIETIC_STEM_CELL_UP"
+                           )
+ getsig_score_plot_MR_all4( "JAATINEN_HEMATOPOIETIC_STEM_CELL_DN"
+                           )
+ getsig_score_plot_MR_all4("B_CELL_MARKER_IN_BM"
+                           )
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 5, fig.height = 4}
+
+getsig_score_plot_MR_all5 <- function(path) {
+coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+#show_col(  coln4)
+#show_col(coln4[c(1:5,4,5,4)])
+coln5 <- coln4[c(1:4,5,4,5,4)]
+#  path = "KEGG_B_CELL_RECEPTOR_SIGNALING_PATHWAY"
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+path =  "KEGG_PURINE_METABOLISM"
+pathway <- pathways.all[path]
+
+sampleinfo <- sampleinfo3_MinoR_all#[!sampleinfo3_MinoR_all$Treatment %in% c("M2","R2","M3"),]
+
+testdataSE <- SummarizedExperiment(assays = SimpleList(data =as.matrix(normalizedCounts_MinoR_all[,sampleinfo$samples])),
+                                   colData = DataFrame(sample =  sampleinfo$treatment)    )
+
+testdataSE@assays@data@listData$counts <- testdataSE@assays@data@listData$data
+hivtb_data <- mkAssay(testdataSE, log = TRUE, counts_to_CPM = TRUE)
+
+ssgsea_result <- runTBsigProfiler(input = hivtb_data,
+                                  useAssay =  "log_counts_cpm", # "log_cpm",
+                                  signatures = pathway,
+                                  algorithm = c("GSVA", "ssGSEA"),
+                                  combineSigAndAlgorithm = TRUE,
+                                  parallel.sz = 1, update_genes = FALSE)
+ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+
+
+s <- sampleinfo
+s$Sig_Score <-# ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+s$pathway <- path
+
+
+
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+t1 <- s
+t1$Treatment2 <- as.character( t1$Treatment )
+t1[t1$Treatment %in% "M1(10)",]$Treatment2 <- "M1"
+t1[t1$Treatment %in% "M2(10)",]$Treatment2 <- "M2"
+t1[t1$Treatment %in% "M3(10)",]$Treatment2 <- "M3"
+t1$Treatment2 <- factor(t1$Treatment2, levels = c("P", "(1)", "(5)", "M1", "R1" , "M2", "R2", "M3"))
+#t1$Treatment2 <- as.character( t1$Treatment )
+
+
+MyComparisons11 = list(c("P", "M1") ,
+                       c("M1", "R1"),
+                       c("R1", "M2") ) 
+
+MyComparisons22 = list( c("R2", "M2"),   c("R2", "M3") )
+
+
+MyComparisons33 = list(c("P", "M1") ,
+                       c("M1", "R1") ) 
+
+t4 <- data_summary(t1, "Sig_Score" ,  c( "Treatment2" , "pathway"))
+
+
+t1
+ MR <- ggplot(subset(t1, Treatment2 %in% c("P",
+                                           "(1)",
+                                           "(5)",
+                                           "M1",
+                                           "R1")), aes(x=Treatment2, y=Sig_Score, fill= Treatment2)) + 
+  
+
+  geom_line(data = subset(t4, Treatment2 %in% c("P",
+                                           "(1)",
+                                           "(5)",
+                                           "M1",
+                                           "R1")),aes(x = as.factor(Treatment2),y=Sig_Score, group = 1), color= "lightgray", size =2) +geom_boxplot()+ geom_point( color = "grey", scales = "free")+
+ geom_boxplot()+  
+     stat_compare_means(comparisons = MyComparisons11,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+    stat_compare_means(comparisons = MyComparisons22,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+ #  stat_compare_means(comparisons = MyComparisons33,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+    
+     stat_compare_means(comparisons = MyComparisons33,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6  ) +
+ theme(legend.title=element_blank()) + scale_fill_manual(values= coln5)+
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) +theme(strip.background = element_blank()) +   theme(axis.text.x = element_text(angle = 45, hjust=1))+ theme(legend.position = "none", )+ ggtitle(path) + theme(plot.title = element_text(hjust = 0.5, size = 10), axis.title.x = element_blank()) + ylab("ssGSEA Signature Score")
+
+return(MR)
+}
+```
+
+
+#supp fig 6E
+```{r, warning=FALSE, message=FALSE, fig.width = 5, fig.height = 4}
+ getsig_score_plot_MR_all5("KEGG_PURINE_METABOLISM")
+```
+
+```{r}
+sessionInfo()
+```

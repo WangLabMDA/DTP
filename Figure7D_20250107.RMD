@@ -1,0 +1,80 @@
+---
+title: "figure 7D"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-01-07'
+---
+
+## The following code repoduces the supplementary Figure 7D in Mega cell manuscripts by Qingsong Cai.
+
+```{r,warning=FALSE, message=FALSE}
+library(survival)
+library(survminer)
+
+library("RColorBrewer")
+```
+
+```{r}
+main_dir <- ("../../processed_data/RNAseq_MCL_samples_147_578_3838_278a/")
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+#load("20230803.for.coxph.rdata") 
+load(paste0(main_dir,"Data/N20230911.for.coxph.rdata"))
+#load(paste0(main_dir, "147_578_3838_278a/Data/20230911.for.coxph.rdata"))  #get pcDat5, pathways.all, info.t, normalizedCounts, countdata.t
+info.t$Therapy_Status <- info.t$current_therapy_status
+#info.t[info.t$Therapy_Status %in% "Non-response", ]
+#info.t[info.t$Therapy_Status %in% "Response", ]
+#info.t[info.t$current_therapy_status %in% "non_Response", ]$Therapy_Status <- "Non-response"
+
+info.t$Therapy_Status <-factor(info.t$Therapy_Status, levels = c("Non-response",
+                                                                 "Response",
+                                                                 "Nondetermined", 
+                                                                 "Margin" ))
+
+
+info.t$Groups <- info.t$Therapy_Status
+nrow(info.t[info.t$Groups %in% "Non-response",])
+nrow(info.t[info.t$Groups %in% "Response",])
+
+
+info.t$Groups_n <- nrow(info.t[info.t$Groups %in% "Non-response",])
+info.t[info.t$Groups %in% "Response",]$Groups_n <- nrow(info.t[info.t$Groups %in% "Response",])
+info.t[info.t$Groups %in% "Nondetermined",]$Groups_n <- nrow(info.t[info.t$Groups %in% "Nondetermined",])
+info.t[info.t$Groups %in% "Margin",]$Groups_n <- nrow(info.t[info.t$Groups %in% "Margin",])
+info.t$Groups2 <- paste0(info.t$Groups,"(n = ", info.t$Groups_n, ")" )
+```
+
+
+#Fig 7D
+```{r, warning=FALSE, message=FALSE, fig.width=6, fig.height = 6}
+
+su <- info.t
+
+###############
+su$Status <- 1
+su[su$alive_status %in% "alive",]$Status <- 0
+su$sur <- su$survival_year_after_collection # su$death.last_visit -su$sample.collection.date.C
+#su$current_therapy_status
+su2 <- su[su$Therapy_Status %in% c("Non-response",  "Response" ),]
+su2$Group <- su2$Therapy_Status
+#su2$sur2 <- su2$sur/365
+su2$Group <- su2$Groups2
+
+pp2 <- ggsurvplot(survfit(Surv(survival_year_after_collection, Status) ~ Group, data = su2),
+          pval = TRUE, conf.int = TRUE,size = 1.5,
+          
+          risk.table = TRUE, # Add risk table
+          risk.table.col = "strata", # Change risk table color by groups
+          linetype =1, # "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+          #palette = c("#0073c2", "#efc000") ,
+         # palette =   c(  "#262a7f",  "#fa654a"), 
+          palette =  c( "#efc000",  c(brewer.pal(n = 4, name = "Blues"))[4]),
+          #palette = c("#E7B800", "#2E9FDF"),
+          ggtheme = theme_bw(base_size = 15))+ ggtitle("BTKi Included Therapy Status")
+
+fig7D <- pp2[[1]] + theme(legend.position = c(0.65,0.45),legend.background=element_blank()  ) + ggtitle("BTKi Included Therapy Status")
+fig7D 
+```

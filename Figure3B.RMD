@@ -67,8 +67,8 @@ length(intersect(intersect(set1, set2),set3))
 library(readxl)
 library(stringr)
 library(ggplot2)
-t2<- read_xlsx("Figure3B.data.with.MEGA_UP548_toShinyGo80.xlsx",sheet = "Curated.MSigDB80")[1:9,]
-t3<- read_xlsx("Figure3B.data.with.MEGA_UP548_toShinyGo80.xlsx",sheet = "GO Biological Process80")[1:9,]#
+t2<- read_xlsx("../../processed_data/RNAseq_MCL_cell_lines/Data/Figure3B.data.with.MEGA_UP548_toShinyGo80.xlsx",sheet = "Curated.MSigDB80")[1:9,]
+t3<- read_xlsx("../../processed_data/RNAseq_MCL_cell_lines/Data/Figure3B.data.with.MEGA_UP548_toShinyGo80.xlsx",sheet = "GO Biological Process80")[1:9,]#
 t3
 t3$Pathway <- str_split_fixed(t3$Pathway, " ", 2)[,2]
 ```
@@ -103,7 +103,7 @@ p1+ theme(axis.text = element_text(size =12)) +
 
 ```{r, fig.width =10, fig.height =10} 
 library("ggpubr")
-pdf(file = "pdf/20250423.RO1-01.pdf",
+pdf(file = "pdf/figure_3B.pdf",
     width = 15.2, # The width    of the plot in inches
     height = 21.2)
  

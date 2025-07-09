@@ -1,0 +1,487 @@
+---
+title: "Figure 4B for DTP cells Blood manuscript"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-07-08'
+---
+
+## The following code repoduces the figure 4B in Mega cell manuscripts by Qingsong Cai.
+```{r,warning=FALSE, message=FALSE}
+#rm(list = ls())
+library(DESeq2)
+library(RColorBrewer)
+library(ggplot2)
+library(ggpubr)
+library(scales)
+library(patchwork)
+library(gridExtra)
+```
+```{r}
+dir("../../processed_data/")
+```
+
+```{r,warning=FALSE, message=FALSE}
+data_dir <- ("../../processed_data/RNAseq_MCL_cell_lines/Data/")
+dir(data_dir)
+#main_dir <- ("\\\\d1prprsh3ccifs/home/lym_myl_rsch/qcai1/RNAseq(from_MCL_Lab)/RNAseq/")
+pathways.all <-   readRDS(paste0(data_dir,"v2022.pathways.all.rds"))
+```
+
+# Fig 4B
+```{r, warning=FALSE, message=FALSE, fig.height = 7, fig.width =10}
+title = "KEGG_CITRATE_CYCLE_TCA_CYCLE"
+a=  c( 2, 0.3,1,12)
+
+heatmapall_data_all2 <- function(gene, main= NA)  {
+  cal_z_score <- function(x){
+    (x - mean(x)) / sd(x)
+  }
+  
+  hmDat  <-vst.MinoR.all[rownames(vst.MinoR.all) %in% gene ,]@assays@data@listData[[1]][,c(1:15)]
+  sampleinfo4 <- colData(vst.MinoR.all)[c(1:15),]
+  my_sample_col <- data.frame(sampleinfo4[,c(3)])
+  rownames(my_sample_col) <- sampleinfo4$samples
+  colnames(my_sample_col) <- "Conditions"
+  
+  hmDat2 <- hmDat[, sampleinfo4$samples]
+  data_subset_norm <-   t(apply(as.matrix(hmDat2), 1, cal_z_score))
+  data_subset_norm.2 <- data_subset_norm[, sampleinfo4$samples ]
+  
+  colnames(data_subset_norm.2) <- paste0("MinoR_",colnames(data_subset_norm.2)  )
+  data_subset_norm.2.MinoR <- data_subset_norm.2
+  rownames(my_sample_col) <- paste0("MinoR_",rownames(my_sample_col  ))
+  my_sample_col.MinoR <- my_sample_col
+  my_sample_col.MinoR$Cells <- "MinoR"
+  my_sample_col.MinoR$Conditions <- as.character(my_sample_col.MinoR$Conditions)
+  my_sample_col.MinoR <- my_sample_col.MinoR[,2:1]
+  my_sample_col.MinoR$Conditions <- factor(my_sample_col.MinoR$Conditions, levels = unique(my_sample_col.MinoR$Conditions) )
+  
+  coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+  #show_col(  coln4)
+  #show_col(coln4[c(1:5,4,5,4)])
+  coln5 <- coln4[c(1:5,4,5,4)]
+  names(coln5) <- levels(my_sample_col.MinoR$Conditions)
+  #show_col(coln5)
+  
+  
+  ann_colors = list(
+    #Time = c("white", "firebrick"),
+    #CellType = c(CT1 = "#1B9E77", CT2 = "#D95F02"),
+    Conditions = coln5
+  )
+  
+  
+  #pB <- pheatmap::pheatmap(data_subset_norm.2.MinoR , annotation_col = my_sample_col.MinoR,  cluster_cols =  F , main= title, annotation_colors = ann_colors, col = colorRampPalette(c("navy", "white", "firebrick3"))(50))
+  
+  
+  
+  hmDat  <-vst.JekoR[rownames(vst.JekoR) %in% gene ,]@assays@data@listData[[1]]
+  sampleinfo4 <- colData(vst.JekoR)#[c(1:12,13:15,16:18),]
+  my_sample_col <- data.frame(sampleinfo4[,c(3)])
+  rownames(my_sample_col) <- sampleinfo4$samples
+  colnames(my_sample_col) <- "Conditions"
+  
+  hmDat2 <- hmDat[, sampleinfo4$samples]
+  data_subset_norm <-   t(apply(as.matrix(hmDat2), 1, cal_z_score))
+  data_subset_norm.2 <- data_subset_norm[, sampleinfo4$samples ]
+  
+  colnames(data_subset_norm.2) <- paste0("JekoR_",colnames(data_subset_norm.2)  )
+  data_subset_norm.2.JekoR <- data_subset_norm.2
+  rownames(my_sample_col) <- paste0("JekoR_",rownames(my_sample_col  ))
+  my_sample_col.JekoR <- my_sample_col
+  my_sample_col.JekoR$Cells <- "JekoR"
+  my_sample_col.JekoR$Conditions <- as.character(my_sample_col.JekoR$Conditions)
+  my_sample_col.JekoR <- my_sample_col.JekoR[,2:1]
+  my_sample_col.JekoR$Conditions <- factor(my_sample_col.JekoR$Conditions, levels = unique(my_sample_col.JekoR$Conditions) )
+  
+  coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+  #show_col(  coln4)
+  #show_col(coln4[c(1:5,4,5,4)])
+  coln5 <- coln4[c(1:5,4,5,4)]
+  names(coln5) <- levels(my_sample_col.MinoR$Conditions)
+  #show_col(coln5)
+  
+  
+  ann_colors = list(
+    #Time = c("white", "firebrick"),
+    #CellType = c(CT1 = "#1B9E77", CT2 = "#D95F02"),
+    Conditions = coln5
+  )
+  
+  
+  #pB <- pheatmap::pheatmap(data_subset_norm.2.JekoR , annotation_col = my_sample_col.JekoR,           cluster_cols =  F , main= title, annotation_colors = ann_colors)
+  
+  data_subset_norm.2.all <-merge(data_subset_norm.2.JekoR, data_subset_norm.2.MinoR, by=0)
+  rownames(data_subset_norm.2.all) <- data_subset_norm.2.all[,1]
+  data_subset_norm.2.all <- data_subset_norm.2.all[,-1]
+  
+  #data_subset_norm.2.all <- cbind(data_subset_norm.2.Jeko1, data_subset_norm.2.JekoR, data_subset_norm.2.MinoR)
+  my_sample_col.all <-rbind(#my_sample_col.Jeko1,
+    my_sample_col.JekoR, my_sample_col.MinoR)
+  
+  return( list(data_subset_norm.2.all, my_sample_col.all) )
+}
+```
+
+```{r}
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+ddsObj.MinoR.all <- readRDS(paste0(data_dir,"ddsObj.MinoR.B1B4H2.2023_0517.RDS"))
+sampleinfo.MinoR.all <- colData(ddsObj.MinoR.all)
+
+
+sampleinfo.MinoR.all$Treatment <- as.character(sampleinfo.MinoR.all$Treatment)
+#unique(sampleinfo.MinoR.all$Treatment)
+sampleinfo.MinoR.all[sampleinfo.MinoR.all$Treatment %in% "D1" ,]$Treatment <- "R1"
+sampleinfo.MinoR.all[sampleinfo.MinoR.all$Treatment %in% "D2" ,]$Treatment <- "R2"
+sampleinfo.MinoR.all$Treatment <- factor(sampleinfo.MinoR.all$Treatment, levels = c("P"  ,    "(1)" ,   "(5)"  ,  "M1(10)" ,"R1" ,    "M2(10)" ,"R2" ,    "M3(10)"
+  
+))
+vst.MinoR.all<-  vst(ddsObj.MinoR.all, blind=FALSE)
+
+#ddsObj.Jeko1 <-   readRDS(paste0(data_dir,"ddsObj.Jeko1.2023_0516.RDS"))
+ddsObj.JekoR <-   readRDS(paste0(data_dir,"ddsObj.JekoR.2203_0516.RDS"))
+
+#sampleinfo.Jeko1 <- colData(ddsObj.Jeko1)
+#vst.Jeko1 <-  vst(ddsObj.Jeko1, blind=FALSE)
+
+sampleinfo.JekoR <- colData(ddsObj.JekoR)
+vst.JekoR <-  vst(ddsObj.JekoR, blind=FALSE)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+sampleinfo4 <- colData(vst.MinoR.all)[c(1:15),]
+my_sample_col <- data.frame(sampleinfo4[,c(3)])
+rownames(my_sample_col) <- sampleinfo4$samples
+colnames(my_sample_col) <- "Conditions"
+
+rownames(my_sample_col) <- paste0("MinoR_",rownames(my_sample_col  ))
+my_sample_col.MinoR <- my_sample_col
+```
+
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width= 10}
+coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+coln5 <- coln4[c(1:5)]
+names(coln5) <- levels(my_sample_col.MinoR$Conditions)[1:5]
+ann_colors = list(
+  #Time = c("white", "firebrick"),
+  #CellType = c(CT1 = "#1B9E77", CT2 = "#D95F02"),
+  Conditions = coln5
+)
+
+show_col(coln5)
+```
+
+```{r, warning=FALSE, message=FALSE,fig.height=5, fig.width= 5}
+colorRampPalette(rev(c("#67001f", "#d6604d", "#f7f7f7", "#4393c3",
+    "#053061")))(20)
+show_col(colorRampPalette(rev(c("#67001f", "#d6604d", "#f7f7f7", "#4393c3",    "#053061")))(20))
+```
+
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width= 10}
+coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#b67909")
+coln5 <- c("grey","#72ADD0",  "#2C6E9E",  "#053061",  "#035708" ) #b67909
+#show_col(coln5)
+
+names(coln5) <- levels(my_sample_col.MinoR$Conditions)[1:5]
+ann_colors = list(
+  #Time = c("white", "firebrick"),
+  #CellType = c(CT1 = "#1B9E77", CT2 = "#D95F02"),
+  Conditions = coln5
+)
+```
+ 
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width= 10}
+list1 <- Purinosome_core <- c("PFAS", "PPAT", "GART", "ATIC", "PAICS", "ADSL","ATIC", "HSP90AA1", "CSNK2A1")
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]]#[,rownames(sinfo)]
+pu = pheatmap::pheatmap(data_subset_norm, 
+                        annotation_col = sinfo , 
+                        cluster_cols =  F,   gaps_col= c(9), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50), silent = T
+                        #  ,fontsize = 12
+)
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height = 7, fig.width =10}
+list1 <- pathways.all[["KEGG_CITRATE_CYCLE_TCA_CYCLE"]]
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)]
+
+p3 <- pB <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo ,  cluster_cols =  F,   gaps_col= c(9), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50) , silent = T)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#str(p3)
+p3$tree_row$labels[p3$tree_row$order]
+a <- p3$tree_row$labels[p3$tree_row$order][1:6]
+b <- p3$tree_row$labels[p3$tree_row$order][7:8]
+c <- p3$tree_row$labels[p3$tree_row$order][9:22]
+d <- p3$tree_row$labels[p3$tree_row$order][23:29]
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height = 7, fig.width =10}
+list1 <- pathways.all[["KEGG_CITRATE_CYCLE_TCA_CYCLE"]]
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)[grepl("MinoR",rownames(sinfo) )]]
+
+p3m <- pB <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo ,  cluster_cols =  F,   gaps_col= c(12), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50) , silent = T)
+```
+
+
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width = 7}
+list1 <- a
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)]
+
+pC1 <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo ,  cluster_cols =  F,   gaps_col= c(9), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50), silent = T )
+``` 
+
+
+
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width = 7}
+list1 <- d
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)]
+
+pC2 <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo ,  cluster_cols =  F,   gaps_col= c(9), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50), silent = T )
+``` 
+
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width = 7}
+list1 <- c(b,c)
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)]
+
+pC3 <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo ,  cluster_cols =  F,   gaps_col= c(9), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50), silent = T )
+``` 
+
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width = 7}
+list1 <- c( "ACLY", "FASN", "ACACA")
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)]
+
+pACLY <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo ,  cluster_cols =  F,   gaps_col= c(9), show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(c("navy", "white", "firebrick3"))(50), silent = T )
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height = 7, fig.width =10}
+dd1 <- data.frame(T2 = c(1.5, 4.5, 7.5,
+                         10.5, 13.5, 16.5,  19.5,22.5),
+                  Y=1,
+                  T1 = c(#"P", "(5)", "M1(10)",
+                    "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]))
+
+h22 <- ggplot(dd1,aes(x = T2, y = 1, fill= T1 )) + xlim(0,40) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = c(1.5, 4.5, 7.5,
+                                10.5, 13.5, 16.5, 
+                                19.5,22.5), labels =c( "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]),
+                     #c( "DMSO", "5µM\nPBN", "10µM\nPBN", "DMSO","1µM\nPBN", "5µM\nPBN", "10µM\nPBN", "Removed\nPBN"),
+                     #c( "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]),
+                     sec.axis = dup_axis(),expand = c(0,0)) + theme_bw() +
+  theme(axis.text.x.top = element_text(angle=45, vjust =0, hjust=0)) +
+  theme(axis.text.y= element_blank(), axis.title= element_blank(), axis.ticks= element_blank())+ 
+  theme(axis.text.x= element_blank(), legend.position = "none",        panel.border = element_blank(),  panel.grid.major = element_blank(),  panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "white")) +   scale_fill_manual(values = rep("white",14))
+#h22
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height = 7, fig.width =10}
+dd1 <- data.frame(T2 = c(1.5, 4.5, 7.5,
+                         10.5, 13.5, 16.5,  19.5,22.5),
+                  Y=1,
+                  T1 = c(#"P", "(5)", "M1(10)",
+                    "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]))
+
+h222 <- ggplot(dd1,aes(x = T2, y = 1, fill= T1 )) + xlim(0,40) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = c(1.2, 4.2, 7.2,
+                                10.5, 13.6, 16.6, 
+                                19.6,22.6), labels =c( "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]),
+                     #c( "DMSO", "5µM\nPBN", "10µM\nPBN", "DMSO","1µM\nPBN", "5µM\nPBN", "10µM\nPBN", "Removed\nPBN"),
+                     #c( "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]),
+                     sec.axis = dup_axis(),expand = c(0,0)) + theme_bw() +
+  theme(axis.text.x.top = element_text(angle=45, vjust =0, hjust=0)) +
+  theme(axis.text.y= element_blank(), axis.title= element_blank(), axis.ticks= element_blank())+ 
+  theme(axis.text.x= element_blank(), legend.position = "none",        panel.border = element_blank(),  panel.grid.major = element_blank(),  panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "white")) +   scale_fill_manual(values = rep("white",14))
+#h222
+```
+
+```{r, warning=FALSE, message=FALSE, fig.height=10,fig.width=10}
+blank <- plot_spacer()+theme_void()
+f3suppF <- 
+  ggarrange(
+    grid.arrange(grobs = list( blank,
+                               blank,
+                               h222,
+                               blank,
+                               
+                               
+                               blank,
+                               blank,
+                               as_ggplot(pC1[[4]]$grobs[[4]]),
+                               as_ggplot(pC1[[4]]$grobs[[5]]),
+                               
+                               
+                               ggplot()+ ylab("TCA_C1")+ theme_classic()+ theme(axis.line.x = element_blank()),
+                               as_ggplot(pC1[[4]]$grobs[[1]]),
+                               as_ggplot(pC1[[4]]$grobs[[2]]),
+                               as_ggplot(pC1[[4]]$grobs[[3]]),
+                               blank,
+                               blank, 
+                               blank,
+                               blank,
+                               ggplot()+ ylab("TCA_C2")+ theme_classic()+ theme(axis.line.x = element_blank()),
+                               as_ggplot(pC2[[4]]$grobs[[1]]),
+                               as_ggplot(pC2[[4]]$grobs[[2]]),
+                               as_ggplot(pC2[[4]]$grobs[[3]]),
+                               blank,
+                               blank, 
+                               blank,
+                               blank,
+                               ggplot()+ ylab("TCA_C3")+ theme_classic()+ theme(axis.line.x = element_blank()),
+                               as_ggplot(pC3[[4]]$grobs[[1]]),
+                               as_ggplot(pC3[[4]]$grobs[[2]]),
+                               as_ggplot(pC3[[4]]$grobs[[3]]),
+                               blank,
+                               blank, 
+                               blank,
+                               blank,
+                               ggplot()+ ylab("Purinosome")+ theme_classic()+ theme(axis.line.x = element_blank()),
+                               as_ggplot(pu[[4]]$grobs[[1]]),
+                               as_ggplot(pu[[4]]$grobs[[2]]),
+                               as_ggplot(pu[[4]]$grobs[[3]]),
+                               blank,
+                               blank, 
+                               blank,
+                               blank,
+                               ggplot()+ ylab("Fatty")+ theme_classic()+ theme(axis.line.x = element_blank()),
+                               as_ggplot(pACLY[[4]]$grobs[[1]]),
+                               as_ggplot(pACLY[[4]]$grobs[[2]]),
+                               as_ggplot(pACLY[[4]]$grobs[[3]])
+    ),
+    ncol =4, nrow =11, heights= c(4 ,
+                                  1.5,
+                                  length(a),
+                                  0.2, 
+                                  length(d),
+                                  0.2,  
+                                  length(c(b,c)),
+                                  0.2,
+                                  length(Purinosome_core),
+                                  0.2,
+                                  3), widths = c(0.8,0.8, 10, 1)),
+    ggarrange( plot_spacer() + theme_void(),
+               as_ggplot(pC1[[4]]$grobs[[7]]),
+               plot_spacer() + theme_void(),
+               as_ggplot(pC2[[4]]$grobs[[6]]),
+               nrow =4, heights =c(1,3,1,3)),
+    ncol=2, widths=c(8,1))
+f3suppF 
+```
+
+ # figure 4B
+ 
+```{r, warning=FALSE, message=FALSE,fig.height=3, fig.width = 7}
+list1 <- c(#a,
+          # "PC"
+           "ACO2" ,  "IDH3A"  ,"PCK2"  , "DLD",    "SUCLA2",
+           d, "OGDH","DLST","FH",  "ACLY")
+sinfo <-  heatmapall_data_all2(list1)[[2]]
+data_subset_norm <- heatmapall_data_all2(list1)[[1]][,rownames(sinfo)[grepl("MinoR",rownames(sinfo) )]]
+
+ sinfo2 <- data.frame(sinfo[,-1])
+ colnames(sinfo2) <-  colnames(sinfo)[2]
+ rownames(sinfo2) <-  rownames(sinfo)
+ #sinfo2
+pF3_1B <- pheatmap::pheatmap(data_subset_norm, annotation_col = sinfo2 , 
+                            cluster_rows =  T, gaps_row= c(12),
+                            cluster_cols =  F, gaps_col= c(3,6,9,12),
+                                show_colnames = F, annotation_colors = ann_colors, fontsize_row =6, col = colorRampPalette(rev(c("#67001f", "#d6604d", "#f7f7f7", "#4393c3",
+    "#053061")))(1024) , silent = T )
+
+#pF3_1B 
+``` 
+
+```{r,fig.width=10,fig.height=1, warning=FALSE, message=FALSE}
+
+library(ggpubr)
+library(patchwork )
+library(gridExtra)
+blank <- plot_spacer()+theme_void()
+
+dd1 = data.frame(X= 1:15, B ="B", Y=0)
+h224 <- ggplot(dd1,aes(x = X, y = Y ))+# ggtitle("Metabolic Profiles") +
+  theme_classic() + 
+                           theme(axis.line  = element_line(color= "white"),
+                                 plot.title = element_text(hjust=0.5, size =18)) + 
+  scale_x_continuous(breaks = c(2,5, 8, 11, 14), labels =levels(my_sample_col.MinoR$Conditions)[1:5]  )+
+  theme(axis.text.y = element_blank(),
+        #axis.text.x.bottom = element_blank(),
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.x = element_text(size =12)
+ 
+        )
+      # h224
+```
+
+
+```{r,fig.width=10,fig.height=5, warning=FALSE, message=FALSE}
+fig3BB <- ggarrange(
+grid.arrange(grobs = list( 
+  blank,
+  blank,
+blank,
+    h224 + theme(plot.title = element_blank()),
+    blank, 
+  
+                           blank,
+                           blank,
+blank,
+                           as_ggplot(pF3_1B[[4]]$grobs[[4]]),
+                           as_ggplot(pF3_1B[[4]]$grobs[[5]]),
+             
+                         ggplot()+ ylab("TCA gene Expression")+ theme_classic() + 
+                           theme(axis.line = element_line(size = 0.5),
+                                 plot.background = element_rect(color = "white", fill = "white"),
+                                 axis.text = element_blank(),
+                                 axis.ticks = element_blank(),
+                                 axis.title = element_text(size = 16)) +
+                           scale_x_continuous(sec.axis = dup_axis()) ,
+                         #theme(axis.line.x.top = element_line(size = 1, color = "black"), axis.line.y.right =   element_blank()  ),
+  blank,
+                           as_ggplot(pF3_1B[[4]]$grobs[[1]]),
+                         #  as_ggplot(p_tca[[4]]$grobs[[6]]),
+                           as_ggplot(pF3_1B[[4]]$grobs[[2]]),
+                           as_ggplot(pF3_1B[[4]]$grobs[[3]])
+
+), 
+ncol =5, widths = c(1,0.5, 1.5,15,2), 
+nrow =3, heights = c(.5,
+                     1,
+                     length(pF3_1B$tree_row$labels)
+                     
+                     )
+),
+
+ggarrange( blank, 
+              blank, #as_ggplot(p_all[[4]]$grobs[[7]]),
+              blank, 
+              as_ggplot(pF3_1B[[4]]$grobs[[7]]),
+              blank,
+              nrow=5, heights = c(0.5,0.8,1,4.5,2)),
+ncol=2, widths= c(10,1))
+fig3BB
+
+```
+
+
+```{r}
+sessionInfo()
+```

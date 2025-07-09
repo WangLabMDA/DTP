@@ -1,0 +1,426 @@
+---
+title: "figure 7F"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-01-07'
+---
+
+## The following code repoduces the supplementary Figure 7F in Mega cell manuscripts by Qingsong Cai.
+```{r,warning=FALSE, message=FALSE}
+library(survival)
+library(survminer)
+library(SummarizedExperiment)
+library(patchwork)
+library(TBSignatureProfiler)
+library(ggrepel)
+library(ggplot2)
+library("RColorBrewer")
+```
+
+
+```{r}
+main_dir <- ("../../processed_data/RNAseq_MCL_samples_147_578_3838_278a/")
+main_dir2 <- ("../../processed_data/RNAseq_MCL_cell_lines/")
+```
+
+```{r,warning=FALSE, message=FALSE}
+load(paste0(main_dir,"Data/N20230911.for.coxph.rdata"))#pcDat5, pathways.all, info.t, normalizedCounts, countdata.t
+
+info.t$Therapy_Status <- info.t$current_therapy_status
+#info.t[info.t$current_therapy_status %in% "non_Response", ]$Therapy_Status <- "Non-response"
+```
+
+# fig7F1
+```{r,warning=FALSE, message=FALSE}
+library(survival)
+library(survminer)
+library(TBSignatureProfiler)
+pathway <-  pathways.all["REACTOME_RRNA_PROCESSING"] #pathways.all["HSC_MARKER_IN_BM"]
+
+
+sampleinfo <- info.t
+
+testdataSE <- SummarizedExperiment(assays = SimpleList(data =as.matrix(normalizedCounts)),
+                                   colData = DataFrame(sample =  sampleinfo$Status)    )
+
+testdataSE@assays@data@listData$counts <- testdataSE@assays@data@listData$data
+hivtb_data <- mkAssay(testdataSE, log = TRUE, counts_to_CPM = TRUE)
+
+ssgsea_result <- runTBsigProfiler(input = hivtb_data,
+                                  useAssay =  "log_counts_cpm", # "log_cpm",
+                                  signatures = pathway,
+                                  algorithm = c("GSVA", "ssGSEA"),
+                                  combineSigAndAlgorithm = TRUE,
+                                  parallel.sz = 1, update_genes = FALSE)
+#ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+#ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+
+s <- info.t
+s$Sig_Score <- 
+  #ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+  s$Sig_Score <- megaup_score <- ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+#s$Sig_Score <- megaup_score <- ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+s[s$Therapy_Status %in% "Non-response",]$Therapy_Status <- "Non-responsive"
+s[s$Therapy_Status %in% "Response",]$Therapy_Status <- "Responsive"
+
+MyComparisons = list(c("Non-responsive", 'Responsive'))
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+pp1up <-   ggboxplot(subset(s, Therapy_Status %in% c("Non-responsive", 'Responsive')), x = "Therapy_Status", y = "Sig_Score", fill = "Therapy_Status", palette = "jco", add = "jitter",
+                     size = 1) +
+  stat_compare_means(comparisons = MyComparisons,method = 't.test', label = "p.signif", , bracket.size = 1) + ggtitle("RRNA_PROCESSING") + ylab("ssGSEA Signature Score") + scale_fill_manual(values =  c(   "#efc000", c(brewer.pal(n = 4, name = "Blues"))[4])                                                                                                            )
+#+ ylim(3,4.3)
+
+#pp1up
+```
+
+```{r,warning=FALSE, message=FALSE, fig.width =5, fig.height=8}
+###############
+s$Status <- 1
+s[s$alive_status %in% "alive",]$Status <- 0
+s$sur <- s$survival_year_after_collection  #death.last_visit -s$sample.collection.date
+
+d1 <- cbind(ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]], s)
+d1 <- d1[order(d1[,1]),]
+#d1$sur <-  d1$DateDeathorLastVisit - d1$Date.collected
+#d1$Group <- c(sample("Low", 12, replace = T), sample("Mid", 11, replace = T), sample("High", 12, replace = T))
+d1$Group <- c(sample("Low", 21, replace = T), sample("Mid", 20, replace = T), sample("High", 21, replace = T))
+#d1$Group <- c(sample("Low", 34, replace = T), sample("Mid", 0, replace = T), sample("High", 34, replace = T))
+#d1$Group <- c(sample("Low", 19, replace = T), sample("Mid", 18, replace = T), sample("High", 19, replace = T))
+d1$Group <- factor(d1$Group , levels = c("Low", "Mid", "High"))
+
+#d1$sur2 <- d1$sur/365
+```
+```{r,warning=FALSE, message=FALSE, fig.width =6, fig.height=6}
+###############
+
+s <- info.t
+s$Status <- 1
+s[s$alive %in% "alive",]$Status <- 0
+
+d1 <- cbind(ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]], s)
+d1 <- d1[order(d1[,1]),]
+
+d1$Group <- c(sample("Low", 41, replace = T), sample("Mid", 0, replace = T), sample("High", 21, replace = T))
+d1$Group <- factor(d1$Group , levels = c("Low", "Mid", "High"))
+
+d1$sur2 <- d1$sur#/365
+fit <- survfit(Surv(sur2, Status) ~ Group, data = d1)
+
+
+pp22_up <- ggsurvplot(fit,size = 1,
+                      pval = TRUE, conf.int = TRUE,
+                      
+                      risk.table = TRUE, # Add risk table
+                      risk.table.col = "strata", # Change risk table color by groups
+                      linetype = "strata", # Change line type by groups
+                      surv.median.line = "hv", # Specify median survival
+                      palette =   c( "gray12",  "gray", c(brewer.pal(n = 4, name = "Blues"))[4]),              #c("#E7B800", "gray", "#2E9FDF"),
+                      ggtheme = theme_bw(base_size = 15))+ ggtitle("RRNA_PROCESSING")
+
+#pp22_up
+```
+
+```{r,warning=FALSE, message=FALSE, fig.width =6, fig.height=6}
+d12 <- d1[d1$Group %in% c("Low", "High"),]
+#d1$Group <- c(sample("Low", 46, replace = T),  sample("High", 24, replace = T))
+#d1$Group <- c(sample("Low", 35, replace = T),  sample("High", 35, replace = T))
+
+fit <- survfit(Surv(sur2, Status) ~ Group, data = d12)
+pp2_up <- ggsurvplot(fit,size = 1.5,
+                     pval = TRUE, conf.int = TRUE,
+                     
+                     risk.table = TRUE, # Add risk table
+                     risk.table.col = "strata", # Change risk table color by groups
+                     linetype =1, # "strata", # Change line type by groups
+                     surv.median.line = "hv", # Specify median survival
+                     palette =   c(   "#262a7f", "#fa654a"), 
+                     # palette = c("#E7B800", "#2E9FDF"),
+                     ggtheme = theme_bw(base_size = 15))+ ggtitle("RRNA_PROCESSING")
+print(
+  pp2_up
+)
+```
+
+
+```{r}
+rrna_plot <- wrap_plots(
+  pp1up + 
+    theme(plot.title =element_blank(),
+          axis.title.x =element_blank(),
+          axis.text.x = element_text(angle =25, hjust =1, vjust =1),
+          legend.position = "none") +theme(plot.title =element_blank(),
+                                           
+                                           # legend.size = 10,
+                                           legend.title = element_blank(),
+                                           legend.text = element_text(size=16),
+                                           legend.background=element_blank() ,
+                                           axis.title.y=element_text(size=16),
+                                           #axis.title.x=element_blank(),
+                                           axis.text.y=element_text(size=14)) + theme(axis.line=element_line(size=1)),
+  
+  pp2_up[[1]] +xlab("Survival year") +  theme_classic() +
+    theme(plot.title = element_blank(), legend.position = "top") +theme(plot.title =element_blank(),
+                                                                        
+                                                                        # legend.size = 10,
+                                                                        legend.title = element_blank(),
+                                                                        legend.text = element_text(size=16),
+                                                                        legend.background=element_blank() ,
+                                                                        axis.title=element_text(size=16),
+                                                                        #axis.title.x=element_blank(),
+                                                                        axis.text=element_text(size=14)) + theme(axis.line=element_line(size=1)),
+  ncol = 2, widths = c(1,2)
+)
+rrna_plot
+```
+
+
+# fig7F2
+```{r,warning=FALSE, message=FALSE}
+pathway <- list (read.csv(paste0(main_dir2,"Data/2023_0517.UP.csv"))[,2])
+                 #pathways.all[1] #pathways.all["HSC_MARKER_IN_BM"]
+sampleinfo <- info.t
+
+testdataSE <- SummarizedExperiment(assays = SimpleList(data =as.matrix(normalizedCounts)),
+                                   colData = DataFrame(sample =  sampleinfo$Status)    )
+
+testdataSE@assays@data@listData$counts <- testdataSE@assays@data@listData$data
+hivtb_data <- mkAssay(testdataSE, log = TRUE, counts_to_CPM = TRUE)
+
+ssgsea_result <- runTBsigProfiler(input = hivtb_data,
+                                  useAssay =  "log_counts_cpm", # "log_cpm",
+                                  signatures = pathway,
+                                  algorithm = c("GSVA", "ssGSEA"),
+                                  combineSigAndAlgorithm = TRUE,
+                                  parallel.sz = 1, update_genes = FALSE)
+#ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+#ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+
+
+s <- info.t
+s$Sig_Score <- 
+  #ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+s$Sig_Score <- megaup_score <- ssgsea_result@colData@listData[[paste0("ssGSEA_",names(pathway))]]
+#s$Sig_Score <- megaup_score <- ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]]
+s[s$Therapy_Status %in% "Non-response",]$Therapy_Status <- "Non-responsive"
+s[s$Therapy_Status %in% "Response",]$Therapy_Status <- "Responsive"
+
+MyComparisons = list(c("Non-responsive", 'Responsive'))
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+pp1up <-   ggboxplot(subset(s, Therapy_Status %in% c("Non-responsive", 'Responsive')), x = "Therapy_Status", y = "Sig_Score", fill = "Therapy_Status", palette = "jco", add = "jitter",
+                     size = 1) +
+  stat_compare_means(comparisons = MyComparisons,method = 't.test', label = "p.signif", , bracket.size = 1) + ggtitle("Mega_UP") + ylab("ssGSEA Signature Score") + scale_fill_manual(values =  c("#efc000" ,brewer.pal(n = 4, name = "Blues")[4]))
+
+# c( "#fa654a",  "#262a7f")
+#pp1up
+```
+
+```{r,warning=FALSE, message=FALSE, fig.width =5, fig.height=8}
+###############
+s$Status <- 1
+s[s$alive_status %in% "alive",]$Status <- 0
+s$sur <- s$survival_year_after_collection  #death.last_visit -s$sample.collection.date
+
+d1 <- cbind(ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]], s)
+d1 <- d1[order(d1[,1]),]
+#d1$sur <-  d1$DateDeathorLastVisit - d1$Date.collected
+#d1$Group <- c(sample("Low", 12, replace = T), sample("Mid", 11, replace = T), sample("High", 12, replace = T))
+d1$Group <- c(sample("Low", 21, replace = T), sample("Mid", 20, replace = T), sample("High", 21, replace = T))
+#d1$Group <- c(sample("Low", 34, replace = T), sample("Mid", 0, replace = T), sample("High", 34, replace = T))
+#d1$Group <- c(sample("Low", 19, replace = T), sample("Mid", 18, replace = T), sample("High", 19, replace = T))
+d1$Group <- factor(d1$Group , levels = c("Low", "Mid", "High"))
+
+#d1$sur2 <- d1$sur/365
+```
+```{r,warning=FALSE, message=FALSE, fig.width =6, fig.height=6}
+###############
+
+s <- info.t
+s$Status <- 1
+s[s$alive %in% "alive",]$Status <- 0
+
+d1 <- cbind(ssgsea_result@colData@listData[[paste0("GSVA_",names(pathway))]], s)
+d1 <- d1[order(d1[,1]),]
+
+d1$Group <- c(sample("Low", 41, replace = T), sample("Mid", 0, replace = T), sample("High", 21, replace = T))
+d1$Group <- factor(d1$Group , levels = c("Low", "Mid", "High"))
+
+d1$sur2 <- d1$sur#/365
+fit <- survfit(Surv(sur2, Status) ~ Group, data = d1)
+
+
+pp22_up <- ggsurvplot(fit,size = 1,
+         pval = TRUE, conf.int = TRUE,
+        
+          risk.table = TRUE, # Add risk table
+          risk.table.col = "strata", # Change risk table color by groups
+          linetype = "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+         palette =   c( "gray12",  "gray", c(brewer.pal(n = 4, name = "Blues"))[4]),              #c("#E7B800", "gray", "#2E9FDF"),
+          ggtheme = theme_bw(base_size = 15))+ ggtitle("Giant_UP")
+#pp22_up
+```
+
+```{r,warning=FALSE, message=FALSE, fig.width =6, fig.height=6}
+d12 <- d1[d1$Group %in% c("Low", "High"),]
+#d1$Group <- c(sample("Low", 46, replace = T),  sample("High", 24, replace = T))
+#d1$Group <- c(sample("Low", 35, replace = T),  sample("High", 35, replace = T))
+
+fit <- survfit(Surv(sur2, Status) ~ Group, data = d12)
+pp2_up <- ggsurvplot(fit,size = 1.5,
+         pval = TRUE, conf.int = TRUE,
+          
+          risk.table = TRUE, # Add risk table
+          risk.table.col = "strata", # Change risk table color by groups
+          linetype =1, # "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+          palette =   c(  "#262a7f",  "#fa654a"), 
+        # palette = c("#E7B800", "#2E9FDF"),
+          ggtheme = theme_bw(base_size = 15))+ ggtitle("Giant_UP")
+print(
+  pp2_up
+)
+```
+
+```{r,warning=FALSE, message=FALSE}
+megaup_plot <- wrap_plots(
+pp1up + 
+      theme(plot.title =element_blank(),
+            axis.title.x =element_blank(),
+            axis.text.x = element_text(angle =25, hjust =1, vjust =1),
+            legend.position = "none") +theme(plot.title =element_blank(),
+                               
+                              # legend.size = 10,
+                               legend.title = element_blank(),
+                               legend.text = element_text(size=16),
+                               legend.background=element_blank() ,
+                               axis.title.y=element_text(size=16),
+                               #axis.title.x=element_blank(),
+                               axis.text.y=element_text(size=14)) + theme(axis.line=element_line(size=1)),
+pp2_up[[1]] +xlab("Survival year") +  theme_classic() +
+  theme(plot.title = element_blank(), legend.position = "top") +theme(plot.title =element_blank(),
+                               
+                              # legend.size = 10,
+                               legend.title = element_blank(),
+                               legend.text = element_text(size=16),
+                               legend.background=element_blank() ,
+                               axis.title=element_text(size=16),
+                               #axis.title.x=element_blank(),
+                               axis.text=element_text(size=14)) + theme(axis.line=element_line(size=1)),
+ncol = 2, widths = c(1,2)
+)
+megaup_plot
+```
+
+
+
+
+# fig7F3
+```{r, warning=FALSE, message=FALSE}
+s <- info.t
+s$Sig_Score <- normalizedCounts["GOT2",]
+s[s$Therapy_Status %in% "Non-response",]$Therapy_Status <- "Non-responsive"
+s[s$Therapy_Status %in% "Response",]$Therapy_Status <- "Responsive"
+
+ MyComparisons = list(c("Non-responsive", 'Responsive'))
+pp1up <- ggboxplot(subset(s, Therapy_Status %in% c("Non-responsive", 'Responsive')), x = "Therapy_Status", y = "Sig_Score", fill = "Therapy_Status", palette = "jco", add = "jitter",
+                     size = 1) +
+  stat_compare_means(comparisons = MyComparisons,method = 't.test', label = "p.signif", , bracket.size = 1) + ggtitle("GOT2") + ylab("gene expression") + scale_fill_manual(values =  c("#efc000" ,brewer.pal(n = 4, name = "Blues")[4]))
+#pp1up + ylim(400, 2500)
+```
+
+
+
+
+```{r,warning=FALSE, message=FALSE, fig.width =6, fig.height=6}
+###############
+
+s <- info.t
+s$Status <- 1
+s[s$alive %in% "alive",]$Status <- 0
+
+d1 <- cbind(normalizedCounts["GOT2",], s)
+d1 <- d1[order(d1[,1]),]
+
+d1$Group <- c(sample("Low", 41, replace = T), sample("Mid", 0, replace = T), sample("High", 21, replace = T))
+d1$Group <- factor(d1$Group , levels = c("Low", "Mid", "High"))
+
+d1$sur2 <- d1$sur#/365
+fit <- survfit(Surv(sur2, Status) ~ Group, data = d1)
+
+
+pp22_up <- ggsurvplot(fit,size = 1,
+         pval = TRUE, conf.int = TRUE,
+        
+          risk.table = TRUE, # Add risk table
+          risk.table.col = "strata", # Change risk table color by groups
+          linetype = "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+         palette =   c( "gray12",  "gray", c(brewer.pal(n = 4, name = "Blues"))[4]),              #c("#E7B800", "gray", "#2E9FDF"),
+          ggtheme = theme_bw(base_size = 15))+ ggtitle("FBL")
+
+#pp22_up
+```
+
+```{r,warning=FALSE, message=FALSE, fig.width =6, fig.height=6}
+d12 <- d1[d1$Group %in% c("Low", "High"),]
+#d1$Group <- c(sample("Low", 46, replace = T),  sample("High", 24, replace = T))
+#d1$Group <- c(sample("Low", 35, replace = T),  sample("High", 35, replace = T))
+
+fit <- survfit(Surv(sur2, Status) ~ Group, data = d12)
+pp2_up <- ggsurvplot(fit,size = 1.5,
+         pval = TRUE, conf.int = TRUE,
+          
+          risk.table = TRUE, # Add risk table
+          risk.table.col = "strata", # Change risk table color by groups
+          linetype =1, # "strata", # Change line type by groups
+          surv.median.line = "hv", # Specify median survival
+          palette =   c(  "#262a7f",  "#fa654a"), 
+        # palette = c("#E7B800", "#2E9FDF"),
+          ggtheme = theme_bw(base_size = 15))+ ggtitle("GOT2")
+print(
+  pp2_up
+)
+```
+
+
+```{r}
+got2_plot <- wrap_plots(
+pp1up + 
+      theme(plot.title =element_blank(),
+            axis.title.x =element_blank(),
+            axis.text.x = element_text(angle =25, hjust =1, vjust =1),
+            legend.position = "none") +theme(plot.title =element_blank(),
+                               
+                              # legend.size = 10,
+                               legend.title = element_blank(),
+                               legend.text = element_text(size=16),
+                               legend.background=element_blank() ,
+                               axis.title.y=element_text(size=16),
+                               #axis.title.x=element_blank(),
+                               axis.text.y=element_text(size=14)) + theme(axis.line=element_line(size=1)),
+pp2_up[[1]] +xlab("Survival year") +  theme_classic() +
+  theme(plot.title = element_blank(), legend.position = "top") +theme(plot.title =element_blank(),
+                               
+                              # legend.size = 10,
+                               legend.title = element_blank(),
+                               legend.text = element_text(size=16),
+                               legend.background=element_blank() ,
+                               axis.title=element_text(size=16),
+                               #axis.title.x=element_blank(),
+                               axis.text=element_text(size=14)) + theme(axis.line=element_line(size=1)),
+ncol = 2, widths = c(1,2)
+)
+got2_plot
+```
+
+```{r,warning=FALSE, message=FALSE}
+sessionInfo()
+```
+
+

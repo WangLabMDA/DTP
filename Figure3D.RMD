@@ -1,0 +1,172 @@
+---
+title: "Figure 3D for DTP cells Blood manuscript"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-07-07'
+---
+
+## The following code repoduces the figure 3D in Mega cell manuscripts by Qingsong Cai.
+```{r,warning=FALSE, message=FALSE}
+rm(list = ls())
+library(DESeq2)
+library(RColorBrewer)
+library(ggplot2)
+library(ggpubr)
+```
+
+
+# Fig 3D
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+bcell <- read.csv("../../processed_data/RNAseq_MCL_cell_lines/Data/cellmarker2bcell.csv")
+colnames(bcell)[1] <- "Species"
+sort(c( bcell[ bcell$Species %in% "Human" 
+      & bcell$Tissue.Class %in% "Blood"
+      & grepl ("Blood",bcell$Tissue.Type ) 
+     &  bcell$Cancer %in% "Normal cell", ]$Cell.marker))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+ddsObj.MinoR.all <- readRDS("../../processed_data/RNAseq_MCL_cell_lines/Data/ddsObj.MinoR.B1B4H2.2023_0517.RDS")
+sampleinfo.MinoR.all <- data.frame(colData(ddsObj.MinoR.all))
+
+sampleinfo.MinoR.all$Treatment <- as.character(sampleinfo.MinoR.all$Treatment)
+#unique(sampleinfo.MinoR.all$Treatment)
+sampleinfo.MinoR.all[sampleinfo.MinoR.all$Treatment %in% "D1" ,]$Treatment <- "R1"
+sampleinfo.MinoR.all[sampleinfo.MinoR.all$Treatment %in% "D2" ,]$Treatment <- "R2"
+sampleinfo.MinoR.all$Treatment <- factor(sampleinfo.MinoR.all$Treatment, levels = c("P"  ,    "(1)" ,   "(5)"  ,  "M1(10)" ,"R1" ,    "M2(10)" ,"R2" ,    "M3(10)" 
+  
+))
+vst.MinoR.all<-  vst(ddsObj.MinoR.all, blind=FALSE)
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 10, fig.height = 7}
+cal_z_score <- function(x){
+  (x - mean(x)) / sd(x)
+  }
+
+  gene = sort(c( bcell[ bcell$Species %in% "Human" 
+      & bcell$Tissue.Class %in% "Blood"
+      & grepl ("Blood",bcell$Tissue.Type ) 
+     &  bcell$Cancer %in% "Normal cell", ]$Cell.marker))
+    gene <- c(gene, "CD22")
+
+gene <- c("CD34",  "DNTT", "RAG1", "RAG2", "CDK4","IGLL1","CD19", #"MS4A1",
+# "NPDC1", "LYTL1","GOLIM4",
+# "CD109",
+"DNMT3B", "SOX4", "FCER2", "CD83", "CD79A", "CD22")
+
+hmDat  <-vst.MinoR.all[rownames(vst.MinoR.all) %in% gene ,]@assays@data@listData[[1]]
+sampleinfo4 <- sampleinfo.MinoR.all #colData(vst.MinoR.all)#[c(1:12,13:15,16:18),]
+my_sample_col <- data.frame(sampleinfo4[,c(3)])
+rownames(my_sample_col) <- sampleinfo4$samples
+colnames(my_sample_col) <- "Conditions"
+ 
+hmDat2 <- hmDat[, sampleinfo4$samples]
+data_subset_norm <-   t(apply(as.matrix(hmDat2), 1, cal_z_score))
+data_subset_norm.2 <- data_subset_norm[, sampleinfo4$samples ]
+
+colnames(data_subset_norm.2) <- paste0("MinoR_",colnames(data_subset_norm.2)  )
+data_subset_norm.2.MinoR <- data_subset_norm.2
+rownames(my_sample_col) <- paste0("MinoR_",rownames(my_sample_col  ))
+my_sample_col.MinoR <- my_sample_col
+my_sample_col.MinoR$Cells <- "MinoR"
+my_sample_col.MinoR$Conditions <- as.character(my_sample_col.MinoR$Conditions)
+my_sample_col.MinoR <- my_sample_col.MinoR[,2:1]
+my_sample_col.MinoR$Conditions <- factor(my_sample_col.MinoR$Conditions, levels = unique(my_sample_col.MinoR$Conditions) )
+
+ coln4 = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+#show_col(  coln4)
+#show_col(coln4[c(1:5,4,5,4)])
+coln5 <- coln4[c(1:5,4,5,4)]
+names(coln5) <- levels(my_sample_col.MinoR$Conditions)
+#show_col(coln5)
+
+
+ann_colors = list(
+    #Time = c("white", "firebrick"),
+    #CellType = c(CT1 = "#1B9E77", CT2 = "#D95F02"),
+    Conditions = coln5
+)
+
+#fig3B <- pheatmap::pheatmap(data_subset_norm.2.MinoR , annotation_col = my_sample_col.MinoR,  cluster_cols =  F,annotation_colors = ann_colors,  silent =F) # main= title, )
+fig3Asi <- pheatmap::pheatmap(data_subset_norm.2.MinoR , annotation_col = my_sample_col.MinoR,  cluster_cols =  F,annotation_colors = ann_colors, col = colorRampPalette(rev(c("#67001f", "#d6604d", "#f7f7f7", "#4393c3",
+    "#053061")))(1024) , silent =T, 
+    gaps_col = c(3,6,9,12,15,17,20))
+#fig3Asi
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.height = 1, fig.width =10}
+dd1 <- data.frame(T2 = c(1.5, 4.5, 7.5,
+                         10.5, 13.5, 16.5,  19.5,22.5),
+                  Y=1,
+                  T1 = c(#"P", "(5)", "M1(10)",
+                    "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]))
+
+h22 <- ggplot(dd1,aes(x = T2, y = 1, fill= T1 )) + xlim(0,40) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = c(1.5, 4.5, 7.5,
+                                10.5, 13.5, 16.5, 
+                                19.5,22.5), labels =c( "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]),
+                     #c( "DMSO", "5µM\nPBN", "10µM\nPBN", "DMSO","1µM\nPBN", "5µM\nPBN", "10µM\nPBN", "Removed\nPBN"),
+                     #c( "P", "(5)", "M1(10)", levels(sampleinfo.MinoR.all$Treatment)[1:5]),
+                     #sec.axis = dup_axis(),
+                     #expand = c(0,0)
+                     ) + theme_bw() +
+  theme(axis.text.x = element_text(angle=45, vjust =0, hjust=0)) +
+  theme(axis.text.y= element_blank(), axis.title= element_blank(), axis.ticks= element_blank())+ 
+  theme(#axis.text.x= element_blank(),
+        legend.position = "none",        panel.border = element_blank(),  panel.grid.major = element_blank(),  panel.grid.minor = element_blank(),
+        axis.line = element_line(colour = "white")) +   scale_fill_manual(values = rep("white",14))
+#h22
+```
+
+
+```{r,warning=FALSE, message=FALSE}
+pB <- fig3Asi# readRDS(paste0(main_dir, "Mega_figure_RDS_2025/fig2D.rds" ))
+library(gridExtra)
+library(grid)
+library(patchwork)
+blank <- grid.rect(gp=gpar(col="white"))
+fig3D <-ggarrange(
+grid.arrange(grobs = list( 
+                           blank,
+                           h22 + theme(plot.margin = margin(0,0,0,0, "cm")) ,
+                           blank,
+                           blank,
+                      
+                           
+                           blank,
+                           as_ggplot(pB[[4]]$grobs[[5]]),
+                           as_ggplot(pB[[4]]$grobs[[6]]),
+                           blank,
+                           
+                           as_ggplot(pB[[4]]$grobs[[1]]),
+                           as_ggplot(pB[[4]]$grobs[[2]]),
+                           as_ggplot(pB[[4]]$grobs[[4]]),
+                           ggarrange(as_ggplot(pB[[4]]$grobs[[8]]),  as_ggplot(pB[[4]]$grobs[[7]]),   ncol=1)
+                           
+                          ),nrow =3, heights=c(1.5,2,10), 
+                            ncol =4, widths = c(0.8, 10, 2,2)))
+fig3D
+```
+
+
+
+```{r, fig.width =10, fig.height =10} 
+library("ggpubr")
+pdf(file = "pdf/figure_3D.pdf",
+    width = 15.2, # The width    of the plot in inches
+    height = 21.2)
+ 
+ggarrange(fig3D,
+ncol=2, 
+widths = c(1.8,3.2),
+nrow=6 
+) + theme(plot.margin = margin(2,2,2,2, "cm"))
+dev.off()
+```
+
+```{r}
+sessionInfo()
+```

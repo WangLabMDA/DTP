@@ -1,0 +1,411 @@
+---
+title: "Figure 7E"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-01-06'
+---
+
+## The following code repoduces the figure 7E in MCL DTP cell manuscripts by Qingsong Cai.
+
+
+```{r}
+main_dir <- ("../../processed_data/RNAseq_MCL_samples_147_578_3838_278a/")
+main_dir2 <- ("../../processed_data/RNAseq_MCL_cell_lines/")
+```
+```{r, warning=FALSE, message=FALSE, fig.height=5, fig.width=7}
+#rm(list = ls())
+library(fgsea)
+library(clusterProfiler)
+library(dplyr)
+library(tibble)
+library(patchwork)
+library(ggplot2)
+library(wesanderson)
+
+```
+
+
+# fig 7E
+```{r, fig.height=5, fig.width= 7}
+alist <- c("JAATINEN_HEMATOPOIETIC_STEM_CELL_UP",
+           "MORI_MATURE_B_LYMPHOCYTE_DN", 
+           "BHATTACHARYA_EMBRYONIC_STEM_CELL"
+           )
+blist <- c("JAATINEN_HEMATOPOIETIC_STEM_CELL_DN",
+           "MORI_MATURE_B_LYMPHOCYTE_UP"
+           )
+clist <- c("REACTOME_NUCLEOTIDE_BIOSYNTHESIS",
+           "REACTOME_FATTY_ACYL_COA_BIOSYNTHESIS",
+           "KEGG_PURINE_METABOLISM",
+           "KEGG_FOLATE_BIOSYNTHESIS",
+           "REACTOME_METABOLISM_OF_RNA",
+           "KEGG_PYRIMIDINE_METABOLISM",
+           "WP_PURINE_METABOLISM_AND_RELATED_DISORDERS",
+           "WP_PROTEOGLYCAN_BIOSYNTHESIS",
+           "WP_FATTY_ACID_BIOSYNTHESIS",
+           "WP_PURINE_METABOLISM"
+           
+           )
+```
+
+```{r, fig.height=7, fig.width= 6, warning=FALSE, }
+data3 <- readRDS(paste0(main_dir,"Data/Mino&Jeko__data.GSEA.20240722MCL.rds"))
+a_color = "red"
+ b_color = "#20cc65"
+ c_color ="blue"
+ d_color = "#5A5156FF"
+```
+
+```{r}
+get_show <- function(model = fit.coxph.tmp, data = su_GSVA) {
+# model = survival::coxph( Surv(sur, Status) ~ REACTOME_PD_1_SIGNALING , data = su_GSVA)
+#  data = su_GSVA
+ main = "Hazard ratio"
+ cpositions = c(0.02, 
+    0.22, 0.4)
+ fontsize = 0.7
+ refLabel = "reference"
+  noDigits = 2
+#data = dat
+conf.high <- conf.low <- estimate <- NULL
+  stopifnot(class(model) == "coxph")
+  data <- data # survminer:::.get_data(model, data = data)
+  terms <- attr(model$terms, "dataClasses")[-1]
+  coef <- as.data.frame(broom::tidy(model))
+  gmodel <- broom::glance(model)
+  allTerms <- lapply(seq_along(terms), function(i) {
+        var <- names(terms)[i]
+        if (terms[i] %in% c("factor", "character")) {
+            adf <- as.data.frame(table(data1[, var]))
+            cbind(var = var, adf, pos = 1:nrow(adf))
+        }
+        else if (terms[i] == "numeric") {
+            data.frame(var = var, Var1 = "", Freq = nrow(data), 
+                pos = 1)
+        }
+        else {
+            vars = grep(paste0("^", var, "*."), coef$term, value = TRUE)
+            data.frame(var = vars, Var1 = "", Freq = nrow(data), 
+                pos = seq_along(vars))
+        }
+    })
+    allTermsDF <- do.call(rbind, allTerms)
+    colnames(allTermsDF) <- c("var", "level", "N", "pos")
+    inds <- apply(allTermsDF[, 1:2], 1, paste0, collapse = "")
+    rownames(coef) <- gsub(coef$term, pattern = "`", replacement = "")
+   tmp<-  cbind(allTermsDF, coef[inds, ])
+   tmp2 <- data.frame(conf.low = log(summary(model)$conf.int[,3]),
+                             conf.high = log(summary(model)$conf.int[,4]))
+tmp <- cbind(tmp, tmp2)
+    toShow <- tmp[, c("var", "level", 
+        "N", "p.value", "estimate", "conf.low", "conf.high", 
+        "pos")]
+    toShowExp <- toShow[, 5:7]
+    toShowExp[is.na(toShowExp)] <- 0
+    toShowExp <- format(exp(toShowExp), digits = noDigits)
+    toShowExpClean <- data.frame(toShow, pvalue = signif(toShow[, 
+        4], noDigits + 1), toShowExp)
+    
+    toShowExpClean$stars <- paste0(round(toShowExpClean$p.value, 
+        noDigits + 1), " ", ifelse(toShowExpClean$p.value < 0.05, 
+        "*", ""), ifelse(toShowExpClean$p.value < 0.01, "*", 
+        ""), ifelse(toShowExpClean$p.value < 0.001, "*", ""))
+    toShowExpClean$ci <- paste0("(", toShowExpClean[, "conf.low.1"], 
+        " - ", toShowExpClean[, "conf.high.1"], ")")
+    toShowExpClean$estimate.1[is.na(toShowExpClean$estimate)] = refLabel
+    toShowExpClean$stars[which(toShowExpClean$p.value < 0.001)] = "<0.001 ***"
+    toShowExpClean$stars[is.na(toShowExpClean$estimate)] = ""
+    toShowExpClean$ci[is.na(toShowExpClean$estimate)] = ""
+    toShowExpClean$estimate[is.na(toShowExpClean$estimate)] = 0
+    toShowExpClean$var = as.character(toShowExpClean$var)
+    toShowExpClean$var[duplicated(toShowExpClean$var)] = ""
+    toShowExpClean$N <- paste0("(N=", toShowExpClean$N, ")")
+    toShowExpClean <- toShowExpClean[nrow(toShowExpClean):1, 
+        ]
+    return(toShowExpClean)
+}
+hz_plot4 <- 
+function(toShowExpClean, main = "Hazard ratio", cpositions = c(0.02, 
+    0.22, 0.4), fontsize = 0.7, refLabel = "reference", noDigits = 2, namesize=2) {
+  rangeb <- range(toShowExpClean$conf.low, toShowExpClean$conf.high, 
+        na.rm = TRUE)
+    breaks <- axisTicks(rangeb/2, log = TRUE, nint = 7)
+    rangeplot <- rangeb
+    rangeplot[1] <- rangeplot[1] - diff(rangeb)
+    rangeplot[2] <- rangeplot[2] + 0.15 * diff(rangeb)
+    width <- diff(rangeplot)
+    y_variable <- rangeplot[1] + cpositions[1] * width
+    y_nlevel <- rangeplot[1] + cpositions[2] * width
+    y_cistring <- rangeplot[1] + cpositions[3] * width
+    y_stars <- rangeb[2]
+    x_annotate <- seq_len(nrow(toShowExpClean))
+    annot_size_mm <- fontsize * as.numeric(convertX(unit(theme_get()$text$size, 
+        "pt"), "mm"))
+
+ p1 <- ggplot(toShowExpClean, aes(var, exp(estimate))) 
+  
+   for ( i in c(0, seq_along(toShowExpClean$var)[(seq_along(toShowExpClean$var) %% 2) == 0])) {
+    # i =0
+ p1 =  p1 + geom_rect(xmin = i+0.5 , xmax =  i+1.5 , ymin = exp(rangeplot[1])-5, ymax = exp(rangeplot[2]+5), fill = "grey" ) 
+   }
+ # geom_rect(xmin =2.5 , xmax = 3.5 , ymin = exp(rangeplot[1]+4.3), ymax = exp(rangeplot[2]+1), fill = ordered(seq_along(var)%%2 + 1)) +
+ #p1  +   theme(axis.text.x=element_text(angle = 45, vjust =1, hjust =1))
+p1 = p1 +  scale_fill_manual(values = c("#FFFFFF33",         "#00000033"), guide = "none") + 
+  geom_point(pch = 15,    size = 4) + 
+  geom_errorbar(aes(ymin = exp(conf.low), ymax = exp(conf.high)), width = 0.15) + 
+  geom_hline(yintercept = 1, linetype = 3)+ 
+  scale_y_log10() + 
+  coord_flip() 
+
+
+p1 <- p1 + scale_y_log10(name = "",         labels = sprintf("%g", c(breaks,1e+04) ), expand = c(0.02, 0.02),         breaks = c(breaks,1e+04) ,limits = c(1e-5,1e4))
+ 
+
+p2 <- p1 +
+  geom_text(aes(x = x_annotate, 
+        y = exp(y_nlevel)), hjust = 0, label = toShowExpClean$level, 
+        vjust = -0.1, size = annot_size_mm) +
+  
+  geom_text( aes(x = x_annotate, 
+            y = exp(y_nlevel)/5,
+            label = toShowExpClean$N), 
+        fontface = "italic", hjust = 0,
+        vjust = ifelse(toShowExpClean$level =="", 0.5, 1.1),
+        size = annot_size_mm
+        )+ geom_text(#geom = "text", 
+        aes(x = x_annotate, y = exp(y_cistring)/1.2, label = toShowExpClean$estimate.1), 
+        size = annot_size_mm, vjust = ifelse(toShowExpClean$estimate.1 == 
+            "reference", 0.5, -0.1)) + 
+    geom_text(aes(x = x_annotate, y = exp(y_cistring)/1.2, label = toShowExpClean$ci), 
+        size = annot_size_mm, vjust = 1.1, fontface = "italic")  +
+  geom_text(aes(x = x_annotate, y = exp(y_stars) , 
+            label = rev(toShowExpClean$stars )), size = annot_size_mm, 
+            hjust = -0.2, fontface = "italic")
+
+
+p3 <- p2 + 
+  theme_light() + theme(panel.grid.minor.y = element_blank(), 
+        panel.grid.minor.x = element_blank(), panel.grid.major.y = element_blank(), 
+        legend.position = "none", panel.border = element_blank(), 
+       # axis.title.y = element_blank(),
+       # , 
+        axis.ticks.y = element_blank(), 
+        plot.title = element_text(hjust = 0.5)) + 
+        xlab("") + ggtitle(main)
+return(p3)
+}
+```
+
+
+```{r}
+library(survival)
+library(grid)
+hz_plot6 <- function(toShowExpClean, main = "Hazard ratio", cpositions = c(0.02, 
+                                                                           0.22, 0.4), fontsize = 0.7, refLabel = "reference", noDigits = 2, namesize=2, minjust= 1, maxjust = 10) {
+#toShowExpClean =  toShowExpClean3[toShowExpClean3$TCGA %in% pp[2],] 
+  
+    rangeb <- range(toShowExpClean$conf.low, toShowExpClean$conf.high, 
+                    na.rm = TRUE)
+    breaks <- axisTicks(rangeb/2, log = TRUE, nint = 7)
+    rangeplot <- rangeb
+    rangeplot 
+    rangeplot[1] <- rangeplot[1] - diff(rangeb)
+    rangeplot[2] <- rangeplot[2] + 0.15 * diff(rangeb)
+    width <- diff(rangeplot)
+    y_variable <- rangeplot[1] + cpositions[1] * width
+    y_nlevel <- rangeplot[1] + cpositions[2] * width
+    y_cistring <- rangeplot[1] + cpositions[3] * width
+    y_stars <- rangeb[2]
+    x_annotate <- seq_len(nrow(toShowExpClean))
+    annot_size_mm <- fontsize * as.numeric(convertX(unit(theme_get()$text$size,  "pt"), "mm"))
+    
+    lim2 <-  c(min(exp(toShowExpClean$conf.low))/minjust,          max(exp(toShowExpClean$conf.high))*maxjust )
+
+p1 <- ggplot(toShowExpClean, aes(var, exp(estimate))) 
+    
+ for ( i in c(0, seq_along(toShowExpClean$var)[(seq_along(toShowExpClean$var) %% 2) == 0])) {
+    # i =0
+ p1 =  p1 + geom_rect(xmin = i+0.5 , xmax =  i+1.5 , ymin = exp(rangeplot[1])-5, ymax = exp(rangeplot[2]+5), fill = "lightgrey" ) 
+   }
+    # geom_rect(xmin =2.5 , xmax = 3.5 , ymin = exp(rangeplot[1]+4.3), ymax = exp(rangeplot[2]+1), fill = ordered(seq_along(var)%%2 + 1)) +
+    #p1  +   theme(axis.text.x=element_text(angle = 45, vjust =1, hjust =1))
+    p1 = p1 +  scale_fill_manual(values = c("#FFFFFF33",         "#00000033"), guide = "none") + 
+      geom_point(pch = 15,    size = 4) + 
+      geom_errorbar(aes(ymin = exp(conf.low), ymax = exp(conf.high)), width = 0.15) + 
+      geom_hline(yintercept = 1, linetype = 3)+ 
+   #   scale_y_log10() + 
+      coord_flip() 
+  
+
+p1 <- p1 + 
+      scale_y_log10(name = "",         labels = sprintf("%g", c(breaks,1e+04) ), expand = c(0.02, 0.02),         breaks = c(breaks,1e+04), limits = lim2 ) 
+    
+    p2 <- p1 +
+      geom_text(aes(x = x_annotate, 
+                    y = exp(y_nlevel)), hjust = 0, label = toShowExpClean$level, 
+                vjust = -0.1, size = annot_size_mm) +
+      
+      geom_text( aes(x = x_annotate, 
+                     y = exp(y_nlevel)/5,
+                     label = toShowExpClean$N), 
+                 fontface = "italic", hjust = 0,
+                 vjust = ifelse(toShowExpClean$level =="", 0.5, 1.1),
+                 size = annot_size_mm
+      )+ geom_text(#geom = "text", 
+        aes(x = x_annotate, y = exp(y_cistring)/1.2, label = toShowExpClean$estimate.1), 
+        size = annot_size_mm, vjust = ifelse(toShowExpClean$estimate.1 == 
+                                               "reference", 0.5, -0.1)) + 
+      geom_text(aes(x = x_annotate, y = exp(y_cistring)/1.2, label = toShowExpClean$ci), 
+                size = annot_size_mm, vjust = 1.1, fontface = "italic")  +
+      geom_text(aes(x = x_annotate,
+                    y = exp(y_stars) , 
+                    label = rev(toShowExpClean$stars)), size = annot_size_mm, 
+                hjust = -0.2, fontface = "italic", color = ifelse(rev(toShowExpClean$pvalue ) < 0.05,             "red","black") ) 
+     
+    p3 <- p2 + 
+      theme_bw() + 
+      ggtitle(paste( "Hazard Ratio",toShowExpClean$N[1] )) +
+      theme(plot.title =element_text(hjust =0.5, face = "bold")) +
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            panel.background = element_blank(), 
+            axis.line = element_line(colour = "black")) + xlab("Hazard ratio")
+    
+    
+    
+    return(p3)
+}
+
+```
+
+```{r}
+i_pbn <- 
+c("HALLMARK_MYC_TARGETS_V1",
+  "REACTOME_TRANSLATION",
+  "REACTOME_METABOLISM_OF_RNA",
+  "REACTOME_RRNA_PROCESSING",
+  "BHATTACHARYA_EMBRYONIC_STEM_CELL",
+  "KEGG_SPLICEOSOME",
+  "KEGG_DNA_REPLICATION",
+  "MORI_MATURE_B_LYMPHOCYTE_DN",
+  "WINTER_HYPOXIA_UP",
+  "KEGG_RIBOSOME",
+  "KEGG_PYRIMIDINE_METABOLISM",
+  "WHITFIELD_CELL_CYCLE_G1_S",
+  "REACTOME_SIGNALING_BY_HEDGEHOG",
+  "KEGG_PURINE_METABOLISM",
+  "REACTOME_FATTY_ACYL_COA_BIOSYNTHESIS",
+  "JAATINEN_HEMATOPOIETIC_STEM_CELL_UP",
+  "MARKS_ACETYLATED_NON_HISTONE_PROTEINS",
+  "MORI_MATURE_B_LYMPHOCYTE_UP",
+  "HALLMARK_INFLAMMATORY_RESPONSE",
+  "WINTER_HYPOXIA_DN",
+  "JAATINEN_HEMATOPOIETIC_STEM_CELL_DN"
+)
+```
+
+
+```{r, fig.height=5, fig.width=10, warning=FALSE, }
+#ff <- readRDS(paste0(main_dir, "Mega_figure_RDS/fig1D.ff.rds" ) )
+#path1 <- c("MEGA_UP", rev(ff[order(ff$NES),]$ID),"MEGA_DN")
+path1 <- i_pbn
+data1 = data3
+gr = unique(data1$Group)[c(4,1,2,3)]
+gr
+data1$Group <- factor(data1$Group, levels = gr)
+data12 <- data1[data1$Group %in% "MCL",]
+data12 <- data12[order(data12$NES),]
+#data12
+```
+
+
+```{r, fig.height=5, fig.width=10, warning=FALSE, }
+data11 <- data1[data1$Group %in% gr[1],]
+path2 <- rev(data1[order(data11$NES),]$pathway)
+
+data1$pathway <-factor(data1$pathway, levels = rev(path2))
+
+path2 == rev(data12$pathway)
+#path2
+```
+
+
+
+
+
+```{r}
+su_GSVA <- readRDS(paste0(main_dir,"Data/su_GSVA_62_0708.path2.rds"))
+dat <- su_GSVA[,c("sur", "Status" ) ]
+paths <- path2
+#paths
+#dat
+```
+
+```{r}
+path <- path2[1]
+dat$PATH <- su_GSVA[,path ]
+t1 <- get_show( survival::coxph( Surv(sur, Status) ~ PATH, data = dat))
+rownames(t1)<- path
+t1$var <- path
+
+toShowExpClean <- t1
+
+for (path in path2){
+  dat$PATH <- su_GSVA[,path ]
+t1 <- get_show( survival::coxph( Surv(sur, Status) ~ PATH, data = dat))
+rownames(t1)<- path
+t1$var <- path
+
+toShowExpClean <- rbind(toShowExpClean ,t1)
+print
+}
+
+toShowExpClean$var <- factor(toShowExpClean$var, levels = rev(path2))
+toShowExpClean <- toShowExpClean[-1,]
+#toShowExpClean
+```
+
+
+
+```{r, fig.height=10, fig.width=10, warning=FALSE, }
+p1 <- ggplot(data1, aes(x= Group, y=pathway, size=-log10(pval) , #abs(NES),
+                  #fill = NES,
+                  fill = NES,
+          #UP_DOWN,
+                  group=Group#,                    shape =  qvalue > 0.05,
+                  )
+            )  +
+  #theme(axis.text.y = element_text( colour = rev(a) ))+ 
+  #scale_color_manual(values= c( "red", "blue")) +
+  geom_point(shape = 21, alpha = 1, color="black", stroke = 1 ) + 
+ # scale_shape_manual(values = c(19,1)) +  #c(19,0, 15, 12))
+#  scale_size(3,10) +
+  #scale_color_gradient2(high="#b40426", mid = "grey", low="#3c4ec1")+ 
+  #scale_fill_gradient2(high="#b40426", mid = "grey", low="#3c4ec1")+ 
+  scale_fill_gradientn(colours = wes_palette(21, name = "Zissou1", type = "continuous"))+
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(axis.title.x=element_blank())+
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) #+   theme(axis.text.x = element_blank())
+
+ a1 <- ifelse(rev(toShowExpClean$var)  %in% alist,             "#495fa8","#5A5156FF")
+ b1 <- ifelse(rev(toShowExpClean$var)  %in% blist,             "#a2bbe3","#5A5156FF")
+ c1 <- ifelse(rev(toShowExpClean$var)  %in% clist,             "#d48c2a","#5A5156FF")
+ a1[b1 %in% "#a2bbe3"] <- "#a2bbe3"
+ a1[c1 %in% "#d48c2a"] <- "#d48c2a"
+ 
+p1 + theme(axis.text.y= element_text(color = a1, size = 12, face ="bold")) 
+```
+
+```{r, warning=FALSE}
+hz_plot6(toShowExpClean, minjust = 10, maxjust = 5) + 
+  theme(#axis.text.y= element_blank(),
+        axis.title.y= element_blank()) +
+  #theme(axis.text.y= element_text(color = a1, size = 12, face ="bold")) +#colour= a1,
+   theme(plot.margin = margin(0,0,0,0, "cm"))
+```
+
+```{r}
+toShowExpClean$var == rev(levels(data1$pathway))
+```
+
