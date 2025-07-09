@@ -1,0 +1,121 @@
+---
+title: "Figure 5E"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-01-06'
+---
+
+## The following code repoduces the figure 3 in MCL giant cell manuscripts by Qingsong Cai.
+
+```{r,warning=FALSE, message=FALSE, fig.height=3, fig.width=5}
+library(fgsea)
+library(wesanderson)
+library(ggplot2)
+#wes_palette(21, name = "Zissou1", type = "continuous")
+```
+
+```{r}
+data3 <- readRDS("../../processed_data/RNAseq_MCL_cell_lines/Data/2023_0519.shrinkLvV_then_GSEA.rdata")
+unique(data3$Group)
+```
+
+
+```{r}
+path1  <- c("GIANT_UP",
+  "JAATINEN_HEMATOPOIETIC_STEM_CELL_UP",
+  "WHITFIELD_CELL_CYCLE_G1_S",
+"KEGG_DNA_REPLICATION",
+"MORI_MATURE_B_LYMPHOCYTE_DN",
+"REACTOME_DOWNSTREAM_SIGNALING_EVENTS_OF_B_CELL_RECEPTOR_BCR",
+"KEGG_APOPTOSIS",
+"HALLMARK_INFLAMMATORY_RESPONSE",
+"MORI_MATURE_B_LYMPHOCYTE_UP",
+"JAATINEN_HEMATOPOIETIC_STEM_CELL_DN")
+```
+
+
+
+```{r, fig.height=5, fig.width=10, warning=FALSE, }
+
+
+data1 = data3
+# data2 = tpb 
+# vs= c(7,8,10,11)
+ vs= c(5,6,8,9)
+
+gr <- unique(data1$Group)[vs]
+data1 <- data1[data1$Group %in% gr,] #[c(1:4,6:7,9)],]
+unique(data1$Group)
+
+data1$Group <- factor(data1$Group, levels = gr)
+
+data11 <- data1[data1$Group %in% gr[1],]
+path1 <- rev(data1[order(data11$NES),]$pathway)
+
+data1$pathway <-factor(data1$pathway, levels = rev(path1))
+path1 <- rev(data1[order(data11$NES),]$pathway)
+
+data1$pathway <-factor(data1$pathway, levels = rev(path1))
+```
+```{r}
+subdata <- subset(data1,pathway %in% c("GIANT_UP",
+  "JAATINEN_HEMATOPOIETIC_STEM_CELL_UP",
+  "WHITFIELD_CELL_CYCLE_G1_S",
+"KEGG_DNA_REPLICATION",
+"MORI_MATURE_B_LYMPHOCYTE_DN",
+"REACTOME_DOWNSTREAM_SIGNALING_EVENTS_OF_B_CELL_RECEPTOR_BCR",
+"KEGG_APOPTOSIS",
+"HALLMARK_INFLAMMATORY_RESPONSE",
+"MORI_MATURE_B_LYMPHOCYTE_UP",
+#"MARKS_ACETYLATED_NON_HISTONE_PROTEINS",
+"JAATINEN_HEMATOPOIETIC_STEM_CELL_DN"
+
+#,"MEGA_DN"
+))
+
+```
+```{r}
+unique(subdata$Group)
+```
+
+
+```{r}
+
+subdata$Group <- subdata$Group2 <- as.character(subdata$Group)
+unique(subdata$Group)
+subdata[subdata$Group %in% "MinoR__PBN(10 µM)_vs_DMSO",]$Group2 <- "G1 vs P ( Mino-VEN-R)"
+subdata[subdata$Group %in% "MinoR__PBN.removed_vs_PBN(10 µM)",]$Group2 <- "R1 vs G1 ( Mino-VEN-R)"
+subdata[subdata$Group %in% "Mega__ACLYi(10 µM)_vs_DMSO",]$Group2 <- "ACLi vs DMSO"
+subdata[subdata$Group %in% "Mega__Acetate(20 mM) with ACLYi(10 µM)_vs_ACLYi(10 µM)",]$Group2 <- "Acetate vs ACLi"
+
+subdata$Group2 <- factor(subdata$Group2, levels = c(
+ "G1 vs P ( Mino-VEN-R)",
+ "R1 vs G1 ( Mino-VEN-R)",
+ "ACLi vs DMSO",
+ "Acetate vs ACLi"
+))
+unique(subdata$Group2)
+```
+# figure 5E
+```{r, fig.height=5, fig.width=8, warning=FALSE, }
+fig5E <- ggplot(subdata, aes(x= Group2, y=pathway, size=-log10(pval) , #abs(NES),
+                  #fill = NES,
+                  fill = NES,
+          #UP_DOWN,
+                  group=Group#,                    shape =  qvalue > 0.05,
+                  )
+            )  +
+  #theme(axis.text.y = element_text( colour = rev(a) ))+ 
+  #scale_color_manual(values= c( "red", "blue")) +
+  geom_point(shape = 21, alpha = 1, color="black" , stroke = 1 ) + 
+ # scale_shape_manual(values = c(19,1)) +  #c(19,0, 15, 12))
+ # scale_size(3,10) +
+  #scale_color_gradient2(high="#b40426", mid = "grey", low="#3c4ec1")+ 
+  #scale_fill_gradient2(high="#b40426", mid = "grey", low="#3c4ec1")+ 
+  scale_fill_gradientn(colours = wes_palette(21, name = "Zissou1", type = "continuous"))+
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(axis.title.x=element_blank())+
+  theme(plot.margin = unit(c(1,1,1,1), "cm")) #+   theme(axis.text.x = element_blank())
+fig5E
+```
