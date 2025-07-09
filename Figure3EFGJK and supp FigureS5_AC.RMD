@@ -1,0 +1,305 @@
+---
+title: "Figure3EFGJK and supp FigureS5_AC"
+author: "+ Qingsong Cai"
+date: "2025-07-09"
+output: html_document
+---
+```{r}
+library(Seurat)
+library(scCustomize)
+library(SeuratWrappers)
+library(patchwork)
+library(monocle3)
+library(ggplot2)
+library(patchwork)
+library(dplyr) 
+library(data.table)
+library(reshape2)
+main_dir = "../../processed_data/scRNAseq_SC197/"
+```
+
+```{r}
+gexws2 <- readRDS(paste0(main_dir, "Data/20230928.objb3.rds"))
+#DimPlot(gexws2, label =T)
+gexws2$umap@cell.embeddings[,1] <- -gexws2$umap@cell.embeddings[,1]
+gexws2$umap@cell.embeddings[,2] <- -gexws2$umap@cell.embeddings[,2]
+#DimPlot(gexws2, label =T, split.by = "orig.ident")
+
+gexws2@meta.data <- cbind(gexws2@meta.data, t(
+readRDS(paste0(main_dir,"Data/20230928.gsva_results_for_objb3_with_C2N.rds")) #[, rownames(gexws@meta.data)]
+))
+gexws2@meta.data$CytoTRACE <- readRDS(paste0(main_dir,"Data/20230928.CytoTRACE_results_for_objb3.rds"))$CytoTRACE #[rownames(gexws2@meta.data)]
+
+gexws2@meta.data$orig.ident <- as.character(gexws2@meta.data$orig.ident)
+gexws2@meta.data$Conditions <- gexws2@meta.data$orig.ident
+gexws2@meta.data[gexws2@meta.data$orig.ident %in% "MinoR",]$Conditions <- "DMSO"
+gexws2@meta.data[gexws2@meta.data$orig.ident %in% "5µM PBN",]$Conditions <- "5 µM PBN"
+gexws2@meta.data[gexws2@meta.data$orig.ident %in% "10µM PBN",]$Conditions <- "10 µM PBN"
+gexws2@meta.data$Conditions  <- factor(gexws2@meta.data$Conditions  , levels =c("DMSO","5 µM PBN","10 µM PBN") )
+gexwss <- subset(gexws2, subset = (Conditions %in% "DMSO" & Clusters %in% 0) |
+                                  (Conditions %in% "5 µM PBN" & Clusters %in% 1) |
+                                  (Conditions %in% "10 µM PBN" & Clusters %in% 2) )
+```
+
+```{r}
+myData.GSVA <- readRDS(paste0(main_dir,"Data/20240214.gsva_results_for_objb3_with_mega.rds"))
+gexws2@meta.data <- cbind(gexws2@meta.data, t(myData.GSVA))
+```
+
+```{r}
+query <- readRDS(paste0(main_dir,"Data/20230928.objb3.bm.predicted.celltype.l2.rds"))
+#readRDS(paste0(main_dir,"Data/20231018.query.rds"))
+query$predicted.celltype.l2 = factor(query$predicted.celltype.l2, levels =  c(
+    "Plasmablast",  "Memory B"  ,   "Naive B" , "Prog_B 1" ,     "Prog_B 2"   ,"Prog_RBC"  ,   "Prog_DC",   "HSC" ,"CD4 Memory" , "pDC"     
+))
+
+gexws2$predicted.celltype.l2 <- query$predicted.celltype.l2
+gexws2$MEGA_UP2 <- "0 ~ 0.25"
+#gexws2@meta.data[gexws2@meta.data$MEGA_UP > 0.2 ,]$MEGA_UP2 <- "B"
+
+
+gexws2@meta.data[#gexws2@meta.data$MEGA_UP > 0.2 
+                 #& gexws2@meta.data$MEGA_DN < -0.1 
+   gexws2@meta.data$nCount_RNA >= 18077
+                 & gexws2@meta.data$nCount_RNA < 23936
+                 ,]$MEGA_UP2 <- "0.25 ~ 0.5"
+
+
+gexws2@meta.data[#gexws2@meta.data$MEGA_UP > 0.2 
+                 #& gexws2@meta.data$MEGA_DN < -0.1 
+   gexws2@meta.data$nCount_RNA >= 23936
+                 & gexws2@meta.data$nCount_RNA < 33786
+                 ,]$MEGA_UP2 <- "0.5 ~ 0.75"
+
+gexws2@meta.data[#gexws2@meta.data$MEGA_UP > 0.2 
+                 #& gexws2@meta.data$MEGA_DN < -0.1 
+   gexws2@meta.data$nCount_RNA >= 33786
+                # & gexws2@meta.data$nCount_RNA < 54512
+                 ,]$MEGA_UP2 <- "0.75 ~ 1"
+```
+
+```{r}
+col3 <- scCustomize::scCustomize_Palette(num_groups = 12, ggplot_default_colors = FALSE, color_seed = 123)
+#scales::show_col(col3)
+#scales::show_col(col3[c(1,8,11)])
+#scales::show_col(col3[c(10,7,6,8,3,2)])
+col6 <- col3[c(2,1,3,5,6:10,12)]#[c(3,2,1,5,9,7,6)]
+#scales::show_col(col6)
+library(RColorBrewer)
+cytoColor = rev(brewer.pal(11, "Spectral")) # Reproduce cytoTRACE colours
+cytoColor[6] = "gold"
+col2 <- rev(brewer.pal(n = 11, name = "RdBu"))
+```
+
+## E
+```{r, fig.width= 3.5, fig.height=3}
+options(repr.plot.width=4.5, repr.plot.height=3)
+DimPlot(gexws2, group.by = "Conditions", cols = col3[c(1,8,11)])
+
+options(repr.plot.width=3.5, repr.plot.height=3)
+DimPlot(gexws2, group.by = "Clusters", cols = col3[c(10,7,6,8,3,2)])
+```
+
+```{r, fig.width= 9, fig.height=3}
+options(repr.plot.width=8, repr.plot.height=3)
+DimPlot(gexws2, group.by = "Clusters", split.by ="Conditions" , cols = col3[c(10,7,6,8,3,2)])
+```
+## F
+```{r, fig.width= 3.5, fig.height=3, warning= FALSE}
+options(warns = -1)
+tn2 <- readRDS( paste0(main_dir,"EVOS/2023_0427.minoR.rds"))
+tn2$Conditions <- tn2$cells
+tn2 <- tn2[tn2$Conditions %in% c("DMSO", "5µM", "10µM" ),]
+
+library(ggplot2)
+minoR_dis <- ggplot(tn2, aes(x=diameter, fill = Conditions)) +
+  geom_density(alpha=0.61) +
+    theme_classic(base_size = 12, base_family = "Helvetica") + theme(legend.position = c(0.65, 0.6)) +ggtitle("Cell size density") + theme(plot.title = element_text(hjust = 0.5)) + xlab("diameter (µm)") +
+    scale_fill_manual(values = col3[c(1,8,11)])
+minoR_dis
+
+X3 <- ggplot(gexws2@meta.data, aes(x=nCount_RNA, fill = Conditions)) +geom_density(alpha=0.6) + theme_classic(base_size = 12, base_family = "Helvetica") + theme(legend.position = c(0.65, 0.6)) +ggtitle("nCount_RNA density") + theme(plot.title = element_text(hjust = 0.5)) +
+    scale_fill_manual(values = col3[c(1,8,11)])
+
+X3
+options(repr.plot.width=6, repr.plot.height=5)
+FeaturePlot(gexws2, feature = "nCount_RNA" ) + scale_color_gradientn(limits = c(3000,120000), colors = colorRampPalette(cytoColor)(50))
+options(repr.plot.width=6, repr.plot.height=5)
+FeaturePlot(gexws2, feature = "MEGA_UP" ) + scale_color_gradientn(colors = colorRampPalette(cytoColor)(50))
+```
+
+```{r}
+Np22513 <- 
+function(obj = gexwsg1a, f1 = "CytoTRACE", colx = pal) {
+    ###########################
+     # obj = gexws2
+     # f1 = "nCount_RNA"
+     # colx = col2
+     # pt = 1
+    ggData = data.table(UMAP1 = as.matrix(obj@reductions$umap@cell.embeddings)[,1], 
+                        UMAP2 = as.matrix(obj@reductions$umap@cell.embeddings)[,2],
+                        Conditions = obj@meta.data$Conditions,
+                        value = obj@meta.data[,f1] )
+     ggData <- ggData[order(ggData$value, decreasing =T),]
+    
+    p1 <- ggplot(ggData, aes(UMAP1, UMAP2, color = value)) +
+      geom_point(size = 0.1) +  
+      theme_bw() +
+      theme(panel.border = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+      #theme_classic(base_size = s) +
+      scale_color_gradientn(colors = colorRampPalette(colx)(50)) +
+
+      #theme(
+      #  strip.background = element_blank(),
+      #  strip.text.x = element_blank()
+      #) + 
+      theme(legend.key.size = unit(0.5, 'cm')) +
+      #theme(legend.position="none") +
+      theme(strip.background = element_blank())+
+      ggtitle(f1) 
+    
+    
+    return(p1)
+  }
+```
+
+## G
+```{r, fig.width= 9, fig.height=3}
+options(repr.plot.width=10, repr.plot.height=3)
+Np22513(gexws2,  "REACTOME_RRNA_PROCESSING", col2) + facet_wrap(~  Conditions)  + 
+ggtitle("RRNA_PROCESSING") +
+      theme(  plot.title = element_text(hjust = 0.5),
+              ) + 
+      theme(   strip.background = element_blank()
+               ,  strip.text.x = element_blank()
+      )  +
+      labs(color = NULL)
+```
+
+## J
+```{r, fig.width= 9, fig.height=3}
+options(repr.plot.width=10, repr.plot.height=3)
+Np22513(gexws2, "CytoTRACE", cytoColor) + 
+      facet_wrap(~  Conditions)  +
+      ggtitle("CytoTRACE") +
+      theme(  plot.title = element_text(hjust = 0.5), 
+              #axis.text.y=element_blank()# ,           axis.title.x=element_blank()   
+      ) + 
+      theme(   strip.background = element_blank()
+               ,  strip.text.x = element_blank()
+      ) +
+      labs(color = NULL)
+```
+
+## K
+
+```{r}
+t1<- t(table(gexws2@meta.data[,c("MEGA_UP2", "predicted.celltype.l2" )]))
+X1 <- 
+ggplot(melt(t1 ), aes(fill=`predicted.celltype.l2`, y=value, x=MEGA_UP2))+  scale_fill_manual( values= col6)  +  
+  geom_bar(position="fill", stat="identity") +
+  theme( strip.background = element_blank(),  strip.text.x = element_blank() ) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) + xlab("quantile of nCount_RNA (cell size)") + ylab("Fraction")
+  theme(text = element_text(size = 12), axis.title.x = element_text(size = 0), axis.title.y = element_text(size = 12)) + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) 
+  options(repr.plot.width=5, repr.plot.height=5)
+ X1 +  guides(fill = guide_legend(nrow = 5))
+```
+## supp 5A
+
+```{r}
+options(repr.plot.width=3, repr.plot.height=3)
+VlnPlot(subset(gexws2, Clusters %in% 0:2), feature = "percent.mt", group.by = "Conditions", pt.size=0) + 
+scale_fill_manual(values = col3[c(1,8,11)])
+
+options(repr.plot.width=9, repr.plot.height=3)
+VlnPlot(subset(gexws2, Clusters %in% 0:2), feature = "percent.mt", 
+        group.by = "Clusters", 
+        split.by= "Conditions", pt.size=1) + 
+scale_fill_manual(values = col3[c(1,8,11)])
+
+options(repr.plot.width=3, repr.plot.height=3)
+VlnPlot(subset(gexws2, Clusters %in% 0:2), feature = "percent.rp", group.by = "Conditions", pt.size=0) + 
+scale_fill_manual(values = col3[c(1,8,11)])
+
+options(repr.plot.width=9, repr.plot.height=3)
+VlnPlot(subset(gexws2, Clusters %in% 0:2), feature = "percent.rp", 
+        group.by = "Clusters", 
+        split.by= "Conditions", pt.size=1) + 
+scale_fill_manual(values = col3[c(1,8,11)])
+```
+
+```{r}
+dotP2 <- function(list1) {
+  p1 <-     DotPlot_scCustom(seurat_object = gexwss, features = list1
+                     , x_lab_rotate = TRUE, colors_use = pal, group.by ="Clusters2" ) +
+      scale_size(range = c(5, 10)) +
+      theme(legend.position=c("right")) + 
+      theme(legend.key.size = unit(0.1, 'cm')) +
+      #	   theme(    legend.position = c(.05, .5),    legend.justification = c("left", "top"),    legend.box.just = "right",    legend.margin = margin(6, 6, 6, 6)    )+
+      theme_classic(base_size = 12)  +     #coord_flip()  + 
+    theme(axis.text = element_text(size = 10)) + #theme(legend.position="none")+
+      # theme(axis.text.x = element_text(angle=90, vjust =1, hjust=1)) +
+      # DotPlot(bm, features = c("PBN_UP","PBN_DN"),  group.by = "celltype.l2") +
+      geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5) +
+      scale_colour_viridis(option="magma") +
+      guides(size=guide_legend(override.aes=list(shape=21, colour="black", fill="white"))) +       theme(axis.title =element_blank())
+         #   ,  axis.text.x =element_blank()
+      #) 
+  
+  return(p1)
+}
+
+
+gexwss@meta.data$Clusters2 <- as.character(gexwss@meta.data$Clusters)
+gexwss@meta.data[gexwss@meta.data$Clusters %in% "0",]$Clusters2 <- "DMSO"
+gexwss@meta.data[gexwss@meta.data$Clusters %in% "1",]$Clusters2 <- "5 µM PBN"
+gexwss@meta.data[gexwss@meta.data$Clusters %in% "2",]$Clusters2 <- "10 µM PBN"
+
+gexwss@meta.data$Clusters2 <- factor(gexwss@meta.data$Clusters2 , levels =
+                                       c("DMSO",
+                                         "5 µM PBN",
+                                         "10 µM PBN"))
+
+pathways.all <-   readRDS(paste0(main_dir,"Data/v2022.pathways.all.rds"))
+library(viridisLite)
+library(viridis)
+pal <- viridis(n = 10, option = "D")
+options(warns = -1, repr.plot.width=9, repr.plot.height=3)
+G <- dotP2(pathways.all[["WP_MITOCHONDRIAL_GENE_EXPRESSION"]]) + 
+ggtitle("WP_MITOCHONDRIAL_GENE_EXPRESSION")+
+theme(plot.title = element_text(hjust = 0.5, size =15 ))
+G  + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), legend.position = "bottom")
+```
+supp 5C
+
+```{r, fig.width= 9, fig.height=3}
+options(repr.plot.width=10, repr.plot.height=3)
+Np22513(gexws2,  "KEGG_B_CELL_RECEPTOR_SIGNALING_PATHWAY", col2) + facet_wrap(~  Conditions)  + 
+ggtitle("KEGG_B_CELL_RECEPTOR_SIGNALING_PATHWAY") +
+      theme(  plot.title = element_text(hjust = 0.5),
+              ) + 
+      theme(   strip.background = element_blank()
+               ,  strip.text.x = element_blank()
+      )  +
+      labs(color = NULL)
+
+options(repr.plot.width=10, repr.plot.height=3)
+Np22513(gexws2,  "MORI_MATURE_B_LYMPHOCYTE_UP", col2) + facet_wrap(~  Conditions)  + 
+ggtitle("MORI_MATURE_B_LYMPHOCYTE_UP") +
+      theme(  plot.title = element_text(hjust = 0.5),
+              ) + 
+      theme(   strip.background = element_blank()
+               ,  strip.text.x = element_blank()
+      )  +
+      labs(color = NULL)
+options(repr.plot.width=10, repr.plot.height=3)
+Np22513(gexws2,  "MORI_MATURE_B_LYMPHOCYTE_DN", col2) + facet_wrap(~  Conditions)  + 
+ggtitle("MORI_MATURE_B_LYMPHOCYTE_DN") +
+      theme(  plot.title = element_text(hjust = 0.5),
+              ) + 
+      theme(   strip.background = element_blank()
+               ,  strip.text.x = element_blank()
+      )  +
+      labs(color = NULL)
+```
+
