@@ -1,0 +1,228 @@
+---
+title: "Figure 4I"
+output: html_document
+author: Qingsong Cai from the University of Texas MD Anderson Cancer Center
+date: '2025-01-06'
+---
+
+## The following code repoduces the figure 4I in MCL giant cell manuscripts by Qingsong Cai.
+
+```{r,warning=FALSE, message=FALSE}
+library(DESeq2)
+library(patchwork)
+library(ggpubr)
+library(RColorBrewer)
+```
+
+```{r,warning=FALSE, message=FALSE}
+data_dir <- "../../processed_data/RNAseq_MCL_cell_lines/Data/"
+pathways.all <-   readRDS(paste0(data_dir,"v2022.pathways.all.rds"))
+```
+
+
+# Fig 4I
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+ddsObj_JekoR <-   readRDS(paste0(data_dir,"/ddsObj.JekoR.2203_0516.RDS"))
+ddsObj_MinoR <-   readRDS(paste0(data_dir,"/ddsObj.MinoR.B1B4H2.2023_0517.RDS"))
+ddsObj_MinoR.ACLY <- readRDS(paste0(data_dir,"/ddsObj.MinoR007.ACLY.2023_0317.RDS"))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+normalizedCounts_MinoR <- counts(ddsObj_MinoR, normalized=TRUE)
+sampleinfo3_MinoR <- data.frame(ddsObj_MinoR@colData )
+
+sampleinfo3_MinoR$Treatment <- as.character(sampleinfo3_MinoR$Treatment)
+#unique(sampleinfo3_MinoR$Treatment)
+sampleinfo3_MinoR[sampleinfo3_MinoR$Treatment %in% "D1" ,]$Treatment <- "R1"
+sampleinfo3_MinoR[sampleinfo3_MinoR$Treatment %in% "D2" ,]$Treatment <- "R2"
+
+sampleinfo3_MinoR$Treatment <- factor(sampleinfo3_MinoR$Treatment, levels = c("P"  ,    "(1)" ,   "(5)"  ,  "M1(10)" ,"R1" ,    "M2(10)" ,"R2" ,    "M3(10)"))
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+
+normalizedCounts_JekoR <- counts(ddsObj_JekoR, normalized=TRUE) 
+sampleinfo3_JekoR <- data.frame(ddsObj_JekoR@colData )
+
+normalizedCounts_ACLY <- counts(ddsObj_MinoR.ACLY, normalized=TRUE) 
+sampleinfo3_ACLY <- data.frame(colData(ddsObj_MinoR.ACLY))
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+gene_expression_1002 <- function(gene,normalizedCounts_MinoR,sampleinfo3_MinoR, normalizedCounts_JekoR,sampleinfo3_JekoR ) {
+#gene <- "RAG1"
+coln = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+#show_col(coln)
+
+sampleinfo_temp <- sampleinfo3_MinoR
+sampleinfo_temp$reads <- normalizedCounts_MinoR[gene,]
+sampleinfo_temp$Cells <- "Mino-VEN-R"
+#sampleinfo_temp[,c(1,3,6:7)]
+
+sampleinfo_temp2 <- sampleinfo3_JekoR
+sampleinfo_temp2$reads <-  normalizedCounts_JekoR[gene,]
+sampleinfo_temp2$Cells <- "Jeko-IBN-R"
+#sampleinfo_temp2[,c(1,3,6:7)]
+
+sampleinfo_temp_all <- rbind(
+  sampleinfo_temp[,c(1,3,6,7)], sampleinfo_temp2[,c(1,3,6,7)]   )
+       
+
+sampleinfo_temp_all$Cells <- factor(sampleinfo_temp_all$Cells , levels = c("Jeko-IBN-R", "Mino-VEN-R"))
+
+#t5 <- data_summary(sampleinfo_temp_all, "reads" ,  c("samples", "Cells","Treatment"))
+t1 <- sampleinfo_temp_all
+
+t1$Treatment2 <- as.character( t1$Treatment )
+
+t1$Treatment2 <- factor(t1$Treatment2, levels = c("P","(1)","(5)",  "M1(10)", "R1" , "M2(10)", "R2", "M3(10)"
+                                                  ))
+t1 <- t1[t1$Treatment2 %in% c("P","(1)","(5)",  "M1(10)", "R1" ),]
+t1$gene <- gene
+
+MyComparisons1 = list(c ("P", "(5)"),c ("P", "M1(10)") ) 
+
+MyComparisons2 = list( c("R1", "M1(10)") ) 
+
+names(coln) <- c("P","(1)","(5)",  "M1(10)", "R1")
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+t4 <- data_summary(t1, "reads" ,  c( "Cells", "Treatment2", "gene"))
+
+p1 <- ggplot(t1 , aes(x=Treatment2, y=reads, fill= Treatment2 ), add ="mean.se") + 
+  geom_line(data = t4,aes(x = as.factor(Treatment2),y=reads, group = 1), color= "lightgray", size =2) +
+  geom_boxplot( ) +
+ # geom_bar(stat="identity") + 
+  facet_grid(gene  ~ Cells ,  scales = "free", space= "free_x" ) +
+  stat_compare_means(comparisons = MyComparisons1,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6 ) +
+  stat_compare_means(comparisons = MyComparisons2,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6 ) +
+  theme_bw()   + theme(axis.title.x=element_blank()) +
+  theme(legend.title=element_blank())  +  scale_fill_manual(values = coln)  +
+theme(strip.background.y = element_blank(),strip.background.x = element_rect(     color="black", fill="white", size=0.5, linetype="solid" )) +  
+  theme(axis.text.x = element_text(angle = 45, hjust=1))+ 
+  theme(legend.position = "none", )  + 
+  ylim(0.9* min(sampleinfo_temp_all$reads), max(sampleinfo_temp_all$reads)*1.2) + 
+  theme(strip.text.x = element_text(size= 14), strip.text.y = element_text(size= 16, face = "bold")) + ylab("Normalized Reads") + 
+  theme(axis.title= element_blank())
+
+return(p1)
+}
+
+#gene_expression_1002("RAG1",normalizedCounts_MinoR,sampleinfo3_MinoR, normalizedCounts_JekoR,sampleinfo3_JekoR )
+```
+
+```{r, warning=FALSE, message=FALSE, fig.width = 8, fig.height = 4}
+fig4I  <- 
+ggarrange(
+      ggplot()+ ylab("Normalized Expression Level")+  theme_classic() + 
+                           theme(axis.line  = element_line(color= "white"),
+                                 axis.title = element_text(size = 12)),
+wrap_plots( 
+gene_expression_1002("GOT1",normalizedCounts_MinoR,sampleinfo3_MinoR, normalizedCounts_JekoR,sampleinfo3_JekoR )+ 
+    theme(strip.text.x = element_text(size= 8)) + ylim(1200,2750),
+
+gene_expression_1002("GOT2",normalizedCounts_MinoR,sampleinfo3_MinoR, normalizedCounts_JekoR,sampleinfo3_JekoR )+ 
+theme(axis.title.y =element_blank() ) + theme(strip.text.x = element_text(size= 8))+
+  ylim(2500,5500),
+nrow =1) ,
+ncol=2, widths = c(1,100))
+fig4I
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 15, fig.height = 20}
+gene_expression_1003 <- function(gene,normalizedCounts_MinoR,sampleinfo3_MinoR ) {
+#gene <- "RAG1"
+coln = c(brewer.pal(n = 5, name = "Blues")[1:4], "#006D2C")
+#show_col(coln)
+
+sampleinfo_temp <- sampleinfo3_MinoR
+sampleinfo_temp$reads <- normalizedCounts_MinoR[gene,]
+sampleinfo_temp$Cells <- "Mino-VEN-R"
+#sampleinfo_temp[,c(1,3,6:7)]
+
+
+sampleinfo_temp_all <- 
+  sampleinfo_temp[,c(1,3,6,7)]
+       
+
+sampleinfo_temp_all$Cells <- factor(sampleinfo_temp_all$Cells , levels = c("Jeko-IBN-R", "Mino-VEN-R"))
+
+#t5 <- data_summary(sampleinfo_temp_all, "reads" ,  c("samples", "Cells","Treatment"))
+t1 <- sampleinfo_temp_all
+
+t1$Treatment2 <- as.character( t1$Treatment )
+
+t1$Treatment2 <- factor(t1$Treatment2, levels = c("P","(1)","(5)",  "M1(10)", "R1" , "M2(10)", "R2", "M3(10)"
+                                                  ))
+t1 <- t1[t1$Treatment2 %in% c("P","(1)","(5)",  "M1(10)", "R1" ),]
+t1$gene <- gene
+
+MyComparisons1 = list(c ("P", "(5)"),c ("P", "M1(10)") ) 
+
+MyComparisons2 = list( c("R1", "M1(10)") ) 
+
+names(coln) <- c("P","(1)","(5)",  "M1(10)", "R1")
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum<-ddply(data, groupnames, .fun=summary_func,
+                  varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+t4 <- data_summary(t1, "reads" ,  c( "Cells", "Treatment2", "gene"))
+
+p1 <- ggplot(t1 , aes(x=Treatment2, y=reads, fill= Treatment2 ), add ="mean.se") + 
+  geom_line(data = t4,aes(x = as.factor(Treatment2),y=reads, group = 1), color= "lightgray", size =2) +
+  geom_boxplot( ) +
+ # geom_bar(stat="identity") + 
+  facet_grid(gene  ~ Cells ,  scales = "free", space= "free_x" ) +
+  stat_compare_means(comparisons = MyComparisons1,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6 ) +
+  stat_compare_means(comparisons = MyComparisons2,  method = 't.test', method.args = list(var.equal = TRUE), label = "p.signif",  size =6 ) +
+  theme_bw()   + theme(axis.title.x=element_blank()) +
+  theme(legend.title=element_blank())  +  scale_fill_manual(values = coln)  +
+theme(strip.background.y = element_blank(),strip.background.x = element_rect(     color="black", fill="white", size=0.5, linetype="solid" )) +  
+  theme(axis.text.x = element_text(angle = 45, hjust=1))+ 
+  theme(legend.position = "none", )  + 
+  ylim(0.9* min(sampleinfo_temp_all$reads), max(sampleinfo_temp_all$reads)*1.2) + 
+  theme(strip.text.x = element_text(size= 14), strip.text.y = element_text(size= 16, face = "bold")) + ylab("Normalized Reads") + 
+  theme(axis.title= element_blank())
+
+return(p1)
+}
+
+#gene_expression_1003("RAG1",normalizedCounts_MinoR,sampleinfo3_MinoR )
+```
+
+
+```{r, warning=FALSE, message=FALSE, fig.width = 8, fig.height = 4}
+fig4I  <- 
+ggarrange(
+      ggplot()+ ylab("Normalized Expression Level")+  theme_classic() + 
+                           theme(axis.line  = element_line(color= "white"),
+                                 axis.title = element_text(size = 12)),
+wrap_plots( 
+gene_expression_1003("GOT1",normalizedCounts_MinoR,sampleinfo3_MinoR)+ 
+    theme(strip.text.x = element_text(size= 8)) + ylim(1200,2500),
+
+gene_expression_1003("GOT2",normalizedCounts_MinoR,sampleinfo3_MinoR)+ 
+theme(axis.title.y =element_blank() ) + theme(strip.text.x = element_text(size= 8))+
+  ylim(2500,4500),
+nrow =1) ,
+ncol=2, widths = c(1,100))
+fig4I
+```
